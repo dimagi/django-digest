@@ -1,0 +1,42 @@
+Visit http://bitbucket.org/akoha/django-digest/ for further information.
+
+This library facilitates the implementation of HTTP Digest Authentication for Django projects.
+
+It supplies a middleware (HttpDigestMiddleware) that may installed to protect access to all
+URLs, a decorator (@httpdigest) that may be applied to selected view functions, and a simple
+class (HttpDigestAuthenticator) that can be used to implement custom authentication scenarios.
+
+The following settings may be defined in your Django settings file. Sensible defaults are
+provided as well.
+
+DIGEST_ENFORCE_NONCE_COUNT (True):
+    Whether the nonce-count supplied by the client is required to increase with each request.
+DIGEST_REALM (DJANGO):
+    The realm value to use.
+DIGEST_NONCE_TIMEOUT_IN_SECONDS (5*60):
+    The maximum time between the generation of a nonce and the initiation of a session with
+    that nonce.
+DIGEST_REQUIRE_AUTHENTICATION (False):
+    If True, the middleware will require all requests to be authenticated. Otherwise, the
+    middleware only performs authentication after intercepting a 401/403 response from the view.
+DIGEST_ACCOUNT_BACKEND ('django_digest.backend.db.AccountStorage'):
+    A class responsible for managing access to users and their credentials. Must implement:
+      * get_partial_digest(self, username):
+            Returns H(username:realm:password) or None
+      * get_user(self, username):
+            Returns an object representing the specified user, or None. This object will be
+	    stored in request.user upon successful authentication.
+DIGEST_NONCE_BACKEND ('django_digest.backend.db.NonceStorage')
+    A class responsible for managing session information. Must implement:
+      * update_existing_nonce(self, user, nonce, nonce_count):
+          Called upon successful authentication of the specified user (as returned from the
+	  account backend's get_user method) with the specified nonce and nonce_count.
+	  If the nonce-count is not being enforced, nonce_count will be None. This method should
+	  return True if the nonce is already associated with the specifed user (only) and the
+	  nonce_count is greater than all previous nonce-counts for the same nonce (or is None)
+	  or False otherwise.
+      * store_nonce(self, user, nonce, nonce_count):
+          Called upon successful authentication of the specified user (as returned from the
+	  account backend's get_user method) if update_existing_nonce returns False. If the
+	  nonce-count is not being enforced, nonce_count will be None. This method should return
+	  True if the nonce is not already associated with any user.
