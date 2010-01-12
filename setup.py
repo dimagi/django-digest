@@ -7,6 +7,10 @@ setup(
     description=('An implementation of HTTP Digest Authentication for Django.'),
     long_description=(
 """
+django-digest supplies a middleware (HttpDigestMiddleware) that may installed to protect access
+to all URLs, a decorator (@httpdigest) that may be applied to selected view functions, and a
+simple class (HttpDigestAuthenticator) that can be used to implement custom authentication
+scenarios.
 """
     ),
     author='Akoha Inc.',

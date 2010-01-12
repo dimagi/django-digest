@@ -27,16 +27,19 @@ class OtherDummyBackendClass(object):
 
 class UtilsTest(TestCase):
     def test_get_setting(self):
-        self.assertEqual('sqlite3', get_setting('DATABASE_ENGINE', 'blah'))
-        self.assertEqual('blah', get_setting('BLAH_BLAH', 'blah'))
-        self.assertEqual(False, get_setting('TEST_SETTING', 'blah'))
+        settings.A_PRESENT_SETTING = 'hello'
+        settings.A_FALSE_SETTING = False
+        self.assertEqual('hello', get_setting('A_PRESENT_SETTING', 'blah'))
+        self.assertEqual('blah', get_setting('AN_ABSENT_SETTING', 'blah'))
+        self.assertEqual(False, get_setting('A_FALSE_SETTING', 'blah'))
 
     def test_get_backend(self):
+        settings.A_PRESENT_BACKEND_SETTING = 'django_digest.tests.DummyBackendClass'
         self.assertEqual(DummyBackendClass,
-                         type(get_backend('TEST_BACKEND_SETTING',
+                         type(get_backend('A_PRESENT_BACKEND_SETTING',
                                           'django_digest.tests.OtherDummyBackendClass')))
         self.assertEqual(OtherDummyBackendClass,
-                         type(get_backend('BLAH_BLAH',
+                         type(get_backend('AN_ABSENT_BACKEND_SETTING',
                                           'django_digest.tests.OtherDummyBackendClass')))
 
 
