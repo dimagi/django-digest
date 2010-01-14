@@ -17,7 +17,7 @@ from django_digest.backend.db import AccountStorage
 from django_digest.decorators import httpdigest
 from django_digest.middleware import HttpDigestMiddleware
 from django_digest.models import PartialDigest
-from django_digest.utils import get_setting, get_backend
+from django_digest.utils import get_setting, get_backend, DEFAULT_REALM
 
 class DummyBackendClass(object):
     pass
@@ -48,10 +48,12 @@ class DjangoDigestTests(TestCase):
         self.mocker = Mocker()
         self.nonce = python_digest.calculate_nonce(time.time(), secret=settings.SECRET_KEY)
         
-    def create_mock_request(self, username='dummy-username', realm=settings.DIGEST_REALM,
+    def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
                             algorithm=None, opaque='dummy-opaque', qop='auth', nonce_count=1,
                             client_nonce=None, password='password', request_path=None):
+        if not realm:
+            realm = get_setting('DIGEST_REALM', DEFAULT_REALM)
         if not nonce:
             nonce=self.nonce
         if not request_path:
@@ -88,7 +90,7 @@ class DjangoDigestTests(TestCase):
         self.assertEqual(401, response.status_code)
         self.assertEqual('digest ', response["WWW-Authenticate"][:7].lower())
         parts = parse_parts(response["WWW-Authenticate"][7:])
-        self.assertEqual(settings.DIGEST_REALM, parts['realm'])
+        self.assertEqual(get_setting('DIGEST_REALM', DEFAULT_REALM), parts['realm'])
 
     def test_decorator_authenticated_with_parens(self):
         response = self.mocker.mock(count=False)
