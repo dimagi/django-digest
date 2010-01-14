@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 
@@ -10,9 +11,10 @@ import python_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
+_l = logging.getLogger(__name__)
 
 class HttpDigestAuthenticator(object):
-
+    
     def __init__(self,
                  account_storage=None,
                  nonce_storage=None,
@@ -51,26 +53,44 @@ class HttpDigestAuthenticator(object):
         if not 'HTTP_AUTHORIZATION' in request.META:
             return False
 
+        if not python_digest.is_digest_credential(request.META['HTTP_AUTHORIZATION']):
+            return False
+
         digest_response = python_digest.parse_digest_credentials(
             request.META['HTTP_AUTHORIZATION'])
 
         if not digest_response:
+            _l.debug('authentication failure: supplied digest credentials could not be ' \
+                         'parsed: "%s".' % request.META['HTTP_AUTHORIZATION'])
             return False
         
         if not digest_response.realm == self.realm:
+            _l.debug('authentication failure: supplied realm "%s" does not match ' \
+                         'configured realm "%s".' % ( digest_response.realm, self.realm))
             return False
 
         if not python_digest.validate_nonce(digest_response.nonce, get_setting('SECRET_KEY')):
+            _l.debug('authentication failure: nonce validation failed.')
             return False
 
         partial_digest = self._account_storage.get_partial_digest(digest_response.username)
+        if not partial_digest:
+            _l.debug('authentication failure: no partial digest available for user "%s".' \
+                         % digest_response.username)
+            return False
+
         calculated_request_digest = python_digest.calculate_request_digest(
             method=request.method, digest_response=digest_response,
             partial_digest=partial_digest)
         if not calculated_request_digest == digest_response.response:
+            _l.debug('authentication failure: supplied request digest does not match ' \
+                         'calculated request digest.')
             return False
 
-        if not request.path == digest_response.uri:
+        if not python_digest.validate_uri(digest_response.uri, request.path):
+            _l.debug('authentication failure: digest authentication uri value "%s" does not ' \
+                         'match value "%s" from HTTP request line.' % (digest_response.uri,
+                                                                       request.path))
             return False
 
         user = self._account_storage.get_user(digest_response.username)
@@ -78,9 +98,13 @@ class HttpDigestAuthenticator(object):
         if not self._update_existing_nonce(user, digest_response.nonce, digest_response.nc):
             if (python_digest.get_nonce_timestamp(digest_response.nonce) + self.timeout <
                 time.time()):
+                _l.debug('authentication failure: attempt to establish a new session with ' \
+                             'a stale nonce.')
                 return False
 
             if not self._store_nonce(user, digest_response.nonce, digest_response.nc):
+                _l.debug('authentication failure: attempt to establish a previously used ' \
+                             'or nonce count.')
                 return False
 
         request.user = user

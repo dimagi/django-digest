@@ -101,8 +101,7 @@ class DjangoDigestTests(TestCase):
             return response
 
         testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
-        request = self.create_mock_request(username=testuser.username,
-                                           password='pass')
+        request = self.create_mock_request(username=testuser.username, password='pass')
         request.user = testuser
 
         with self.mocker:
@@ -117,12 +116,44 @@ class DjangoDigestTests(TestCase):
             return response
 
         testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
-        request = self.create_mock_request(username=testuser.username,
-                                           password='pass')
+        request = self.create_mock_request(username=testuser.username, password='pass')
         request.user = testuser
 
         with self.mocker:
             self.assertEqual(response, test_view(request))
+        
+    def test_decorator_authenticated_with_full_uri(self):
+        response = self.mocker.mock(count=False)
+        expect(response.status_code).result(200)
+
+        @httpdigest
+        def test_view(request):
+            return response
+
+        testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
+        request = self.create_mock_request(username=testuser.username, password='pass',
+                                           uri='http://server:8000/some/path?q=v',
+                                           request_path='/some/path')
+        request.user = testuser
+
+        with self.mocker:
+            self.assertEqual(response, test_view(request))
+        
+    def test_decorator_with_realm_mismatch(self):
+        response = self.mocker.mock(count=False)
+
+        @httpdigest
+        def test_view(request):
+            return response
+
+        testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
+        request = self.create_mock_request(username=testuser.username, password='pass',
+                                           realm='BAD_REALM')
+
+        with self.mocker:
+            final_response = test_view(request)
+            self.assertEqual(401, final_response.status_code)
+            self.assertTrue('WWW-Authenticate' in final_response)
         
     def test_decorator_unauthenticated_and_custom_settings(self):
         response = self.mocker.mock(count=False)
@@ -215,6 +246,9 @@ class DjangoDigestTests(TestCase):
         twelfth_request = self.create_mock_request(username=testuser.username,
                                                    password='pass', nonce_count=3)
         
+        # a request for Basic auth
+        thirteenth_request = self.create_mock_request_for_header('Basic YmxhaDpibGFo')
+
         with self.mocker:
             self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(first_request))
             self.assertTrue(HttpDigestAuthenticator().authenticate(first_request))
@@ -231,6 +265,7 @@ class DjangoDigestTests(TestCase):
 
             PartialDigest.objects.all().delete()
             self.assertFalse(HttpDigestAuthenticator().authenticate(twelfth_request))
+            self.assertFalse(HttpDigestAuthenticator().authenticate(thirteenth_request))
 
 class ModelsTests(TestCase):
     def test_partial_digest_creation(self):
