@@ -190,7 +190,30 @@ class DjangoDigestTests(TestCase):
             self.assertEqual(401, final_response.status_code)
             self.assertTrue('WWW-Authenticate' in final_response)
             self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
-        
+
+    def test_disable_nonce_count_enforcement(self):
+        old_digest_enforce_nonce_count = None
+        if hasattr(settings, 'DIGEST_ENFORCE_NONCE_COUNT'):
+            old_digest_enforce_nonce_count = settings.DIGEST_ENFORCE_NONCE_COUNT
+        settings.DIGEST_ENFORCE_NONCE_COUNT = False
+        try:
+            testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
+            first_request = self.create_mock_request(username=testuser.username,
+                                                     password='pass')
+            first_request.user = testuser
+            
+            # same nonce, same nonce count, will fail
+            second_request = self.create_mock_request(username=testuser.username,
+                                                      password='pass')
+            second_request.user = testuser
+            with self.mocker:
+                self.assertTrue(HttpDigestAuthenticator().authenticate(first_request))
+                self.assertTrue(HttpDigestAuthenticator().authenticate(second_request))
+        finally:
+            if old_digest_enforce_nonce_count is not None:
+                settings.DIGEST_ENFORCE_NONCE_COUNT = old_digest_enforce_nonce_count
+
+
     def test_authenticate(self):
         testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
         otheruser = User.objects.create_user('otheruser', 'otheruser@example.com', 'pass')

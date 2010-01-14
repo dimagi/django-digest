@@ -24,7 +24,7 @@ class HttpDigestAuthenticator(object):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
-            self._enforce_nonce_count = get_setting('DIGEST_ENFORCE_NONCE_COUNT', True),
+            self._enforce_nonce_count = get_setting('DIGEST_ENFORCE_NONCE_COUNT', True)
         self.realm = realm or get_setting('DIGEST_REALM', DEFAULT_REALM)
         self.timeout = timeout or get_setting('DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
         self._account_storage = (account_storage or get_backend(
