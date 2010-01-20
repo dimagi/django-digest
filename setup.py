@@ -17,7 +17,8 @@ scenarios.
     author_email='adminmail@akoha.com',
     url='http://bitbucket.org/akoha/django-digest/',
     packages=['django_digest',
-              'django_digest.backend'],
+              'django_digest.backend',
+              'django_digest.migrations'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Web Environment',
