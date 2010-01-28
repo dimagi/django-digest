@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='django-digest',
-    version='1.3',
+    version='1.4',
     description=('An implementation of HTTP Digest Authentication for Django.'),
     long_description=(
 """
@@ -28,5 +28,5 @@ scenarios.
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules'
      ],
-    zip_safe=True,
+    zip_safe=False,
 )
