@@ -15,7 +15,6 @@ class DetectAuth(BaseAuth):
             
             challenges = self._authenticate_headers(response)
             for method, challenge in challenges.iteritems():
-                print "******** '%s'" % method
                 # Loop through possible challenges to find the first one we
                 # can handle.
                 if method not in self.client.AUTH_METHODS:
