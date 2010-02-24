@@ -20,13 +20,21 @@ def reset_queries(**kwargs):
         _connection.queries = []
 signals.request_started.connect(reset_queries)
 
-def get_connection():
-
+def is_test_mode():
     # hack - in tests we want to run within the same transaction
     # as the test case to pick up users created there
     from django.template import Template
     from django.test.utils import instrumented_test_render
-    if Template.render.__name__ == 'instrumented_test_render':
+    return Template.render.__name__ == 'instrumented_test_render'
+
+def commit():
+    if not is_test_mode():
+        get_connection().connection.commit()
+    
+def get_connection():
+    global _connection
+
+    if is_test_mode():
         return global_connection
 
     if not _connection:
@@ -82,6 +90,7 @@ class AccountStorage(object):
         cursor = get_connection().cursor()
         cursor.execute(GET_PARTIAL_DIGEST_QUERY, [username])
         row = cursor.fetchone()
+        commit()
         if not row:
             return None
         return row[0]
@@ -97,10 +106,12 @@ class NonceStorage(object):
         cursor = get_connection().cursor()
         cursor.execute(DELETE_OLDER_THAN_QUERY, [user.id])
         row = cursor.fetchone()
+        commit()
         if not row:
             return
         delete_older_than = row[0]
         cursor.execute(DELETE_EXPIRED_NONCES_QUERY, [delete_older_than])
+        commit()
 
     def update_existing_nonce(self, user, nonce, nonce_count):
         cursor = get_connection().cursor()
@@ -115,6 +126,8 @@ class NonceStorage(object):
                              get_connection().ops.value_to_db_datetime(datetime.now()),
                              nonce, user.id, nonce_count])
         
+        commit()
+
         # if no rows are updated, either the nonce isn't in the DB, it's for a different
         # user, or the count is bad
         return cursor.rowcount == 1
@@ -130,3 +143,5 @@ class NonceStorage(object):
             return True
         except IntegrityError:
             return False
+        finally:
+            commit()
