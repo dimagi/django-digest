@@ -1,5 +1,7 @@
 import md5
 
+from django.conf import settings
+from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save
@@ -8,7 +10,7 @@ from python_digest import calculate_partial_digest
 
 from django_digest.utils import get_setting, DEFAULT_REALM
 
-REALM = get_setting('DIGEST_REALM', DEFAULT_REALM)
+REALM = get_setting(settings, 'DIGEST_REALM', DEFAULT_REALM)
 
 class UserNonce(models.Model):
     user = models.ForeignKey(User)
@@ -38,6 +40,18 @@ def _new_set_password(user, password):
     _postponed_partial_digests[user.password] = partial_digest
     
 User.set_password = _new_set_password
+
+_old_authenticate = ModelBackend.authenticate
+
+def _new_authenticate(backend, username=None, password=None):
+    user = _old_authenticate(backend, username, password)
+    if user:
+        partial_digest = calculate_partial_digest(user.username, REALM, password)
+        PartialDigest.objects.filter(user=user).delete()
+        PartialDigest.objects.create(user=user, partial_digest=partial_digest)
+    return user
+
+ModelBackend.authenticate = _new_authenticate
 
 def _persist_partial_digest(sender, instance=None, **kwargs):
     if instance is None:

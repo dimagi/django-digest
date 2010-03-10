@@ -1,15 +1,13 @@
 DEFAULT_REALM = 'DJANGO'
 
-def get_setting(setting_name, default=None):
-    from django.conf import settings
-
+def get_setting(settings, setting_name, default=None):
     if hasattr(settings, setting_name):
         return getattr(settings, setting_name)
     else:
         return default
 
-def get_backend(setting_name, default_backend_class_path):
-    path = get_setting(setting_name, default_backend_class_path)
+def get_backend(settings, setting_name, default_backend_class_path):
+    path = get_setting(settings, setting_name, default_backend_class_path)
 
     from django.core import exceptions
     from django.utils.importlib import import_module

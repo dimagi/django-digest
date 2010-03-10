@@ -6,7 +6,6 @@ from django.core import signals
 from django.db import backend, connection as global_connection, IntegrityError
 
 from django_digest.models import UserNonce, PartialDigest
-from django_digest.utils import get_setting
 
 _connection = None
 

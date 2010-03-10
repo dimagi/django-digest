@@ -2,6 +2,7 @@ import logging
 import random
 import time
 
+from django.conf import settings as django_settings
 from django.core import exceptions
         
 from django.http import HttpRequest, HttpResponse
@@ -20,17 +21,19 @@ class HttpDigestAuthenticator(object):
                  nonce_storage=None,
                  realm=None,
                  timeout=None,
-                 enforce_nonce_count=None):
+                 enforce_nonce_count=None,
+                 settings=django_settings):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
-            self._enforce_nonce_count = get_setting('DIGEST_ENFORCE_NONCE_COUNT', True)
-        self.realm = realm or get_setting('DIGEST_REALM', DEFAULT_REALM)
-        self.timeout = timeout or get_setting('DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
-        self._account_storage = (account_storage or get_backend(
+            self._enforce_nonce_count = get_setting(settings, 'DIGEST_ENFORCE_NONCE_COUNT', True)
+        self.realm = realm or get_setting(settings, 'DIGEST_REALM', DEFAULT_REALM)
+        self.timeout = timeout or get_setting(settings, 'DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
+        self._account_storage = (account_storage or get_backend(settings,
                 'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.db.AccountStorage'))
-        self._nonce_storage = (nonce_storage or get_backend(
+        self._nonce_storage = (nonce_storage or get_backend(settings,
                 'DIGEST_NONCE_BACKEND', 'django_digest.backend.db.NonceStorage'))
+        self.secret_key = get_setting(settings, 'SECRET_KEY')
 
     @staticmethod
     def contains_digest_credentials(request):
@@ -69,7 +72,7 @@ class HttpDigestAuthenticator(object):
                          'configured realm "%s".' % ( digest_response.realm, self.realm))
             return False
 
-        if not python_digest.validate_nonce(digest_response.nonce, get_setting('SECRET_KEY')):
+        if not python_digest.validate_nonce(digest_response.nonce, self.secret_key):
             _l.debug('authentication failure: nonce validation failed.')
             return False
 
@@ -116,5 +119,5 @@ class HttpDigestAuthenticator(object):
         opaque =  ''.join([random.choice('0123456789ABCDEF') for x in range(32)])
 
         response["WWW-Authenticate"] = python_digest.build_digest_challenge(
-            time.time(), get_setting('SECRET_KEY'), self.realm, opaque, stale)
+            time.time(), self.secret_key, self.realm, opaque, stale)
         return response

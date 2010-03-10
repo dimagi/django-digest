@@ -1,11 +1,14 @@
 from django_digest import HttpDigestAuthenticator
+from django.conf import settings as django_settings
 from django_digest.utils import get_setting
 
 class HttpDigestMiddleware(object):
-    def __init__(self, require_authentication=None, authenticator=None):
+    def __init__(self, require_authentication=None, authenticator=None,
+                 settings=django_settings):
         if require_authentication == None:
-            require_authentication = get_setting('DIGEST_REQUIRE_AUTHENTICATION', False)
-        self._authenticator = authenticator or HttpDigestAuthenticator()
+            require_authentication = get_setting(settings, 'DIGEST_REQUIRE_AUTHENTICATION',
+                                                 False)
+        self._authenticator = authenticator or HttpDigestAuthenticator(settings=settings)
         self._require_authentication = require_authentication
 
     def process_request(self, request):
