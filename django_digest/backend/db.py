@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.conf import settings
@@ -8,6 +9,7 @@ from django.db import backend, connection as global_connection, IntegrityError
 from django_digest.models import UserNonce, PartialDigest
 
 _connection = None
+_l = logging.getLogger(__name__)
 
 def close_connection(**kwargs):
     if _connection:
@@ -50,9 +52,12 @@ def get_connection():
     return _connection
 
 GET_PARTIAL_DIGEST_QUERY = """
-SELECT django_digest_partialdigest.partial_digest FROM django_digest_partialdigest
+SELECT django_digest_partialdigest.login, django_digest_partialdigest.partial_digest
+  FROM django_digest_partialdigest
   INNER JOIN auth_user ON auth_user.id = django_digest_partialdigest.user_id
-  WHERE auth_user.username = %s
+  WHERE django_digest_partialdigest.login = %s
+    AND django_digest_partialdigest.confirmed
+    AND auth_user.is_active
 """
 
 DELETE_OLDER_THAN_QUERY = """
@@ -84,21 +89,33 @@ INSERT INTO django_digest_usernonce (user_id, nonce, count, last_used_at)
   VALUES (%s, %s, %s, %s)
 """
 
+from django_digest.models import (_after_authenticate as update_partial_digests,
+                                  _review_partial_digests as review_partial_digests)
+
 class AccountStorage(object):
     def get_partial_digest(self, username):
         cursor = get_connection().cursor()
         cursor.execute(GET_PARTIAL_DIGEST_QUERY, [username])
-        row = cursor.fetchone()
+        # In MySQL, String comparison is case-insensitive by default.
+        # Therefore a second round of filtering is required.
+        row = [(row[1]) for row in cursor.fetchall() if row[0] == username]
         commit()
         if not row:
             return None
         return row[0]
 
     def get_user(self, username):
-        try:
-            return User.objects.get(username=username)
-        except User.DoesNotExist:
+        # In MySQL, String comparison is case-insensitive by default.
+        # Therefore a second round of filtering is required.
+        pds = [pd for pd in PartialDigest.objects.filter(
+                login=username, user__is_active=True) if pd.login == username]
+        if len(pds) == 0:
             return None
+        if len(pds) > 1:
+            _l.warn("Multiple partial digests found for the login %r" % username)
+            return None
+        
+        return pds[0].user
 
 class NonceStorage(object):
     def _expire_nonces_for_user(self, user):

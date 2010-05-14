@@ -2,7 +2,6 @@ import logging
 import random
 import time
 
-from django.conf import settings as django_settings
 from django.core import exceptions
         
 from django.http import HttpRequest, HttpResponse
@@ -14,6 +13,15 @@ from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
 _l = logging.getLogger(__name__)
 
+class DefaultLoginFactory(object):
+    def confirmed_logins_for_user(self, user):
+        return [login for login in
+                [user.username, user.username.lower(), user.email,
+                 user.email and user.email.lower()] if login]
+
+    def unconfirmed_logins_for_user(self, user):
+        return []
+
 class HttpDigestAuthenticator(object):
     
     def __init__(self,
@@ -21,19 +29,18 @@ class HttpDigestAuthenticator(object):
                  nonce_storage=None,
                  realm=None,
                  timeout=None,
-                 enforce_nonce_count=None,
-                 settings=django_settings):
+                 enforce_nonce_count=None):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
-            self._enforce_nonce_count = get_setting(settings, 'DIGEST_ENFORCE_NONCE_COUNT', True)
-        self.realm = realm or get_setting(settings, 'DIGEST_REALM', DEFAULT_REALM)
-        self.timeout = timeout or get_setting(settings, 'DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
-        self._account_storage = (account_storage or get_backend(settings,
+            self._enforce_nonce_count = get_setting('DIGEST_ENFORCE_NONCE_COUNT', True)
+        self.realm = realm or get_setting('DIGEST_REALM', DEFAULT_REALM)
+        self.timeout = timeout or get_setting('DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
+        self._account_storage = (account_storage or get_backend(
                 'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.db.AccountStorage'))
-        self._nonce_storage = (nonce_storage or get_backend(settings,
+        self._nonce_storage = (nonce_storage or get_backend(
                 'DIGEST_NONCE_BACKEND', 'django_digest.backend.db.NonceStorage'))
-        self.secret_key = get_setting(settings, 'SECRET_KEY')
+        self.secret_key = get_setting('SECRET_KEY')
 
     @staticmethod
     def contains_digest_credentials(request):

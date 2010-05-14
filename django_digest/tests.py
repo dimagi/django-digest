@@ -1,6 +1,7 @@
 from __future__ import with_statement
-from django.test import TestCase
+from django.test import TestCase as DjangoTestCase
 
+from contextlib import contextmanager
 import time
 
 from mocker import Mocker, expect
@@ -8,9 +9,10 @@ from mocker import Mocker, expect
 import python_digest
 from python_digest.utils import parse_parts
 
-from django.conf import settings as django_settings
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import HttpRequest
+from django.utils.functional import LazyObject
 
 from django_digest import HttpDigestAuthenticator
 from django_digest.backend.db import AccountStorage
@@ -19,53 +21,94 @@ from django_digest.middleware import HttpDigestMiddleware
 from django_digest.models import PartialDigest
 from django_digest.utils import get_setting, get_backend, DEFAULT_REALM
 
+@contextmanager
+def patch(namespace, **values):
+    """Patches `namespace`.`name` with `value` for (name, value) in values"""
+    
+    originals = {}
+
+    if isinstance(namespace, LazyObject):
+        if namespace._wrapped is None:
+            namespace._setup()
+        namespace = namespace._wrapped
+
+    for (name, value) in values.iteritems():
+        try:
+            originals[name] = getattr(namespace, name)
+        except AttributeError:
+            originals[name] = NotImplemented
+        if value is NotImplemented:
+            if originals[name] is not NotImplemented:
+                delattr(namespace, name)
+        else:
+            setattr(namespace, name, value)
+
+    try:
+        yield
+    finally:
+        for (name, original_value) in originals.iteritems():
+            if original_value is NotImplemented:
+                if values[name] is not NotImplemented:
+                    delattr(namespace, name)
+            else:
+                setattr(namespace, name, original_value) 
+
 class DummyBackendClass(object):
     pass
 
 class OtherDummyBackendClass(object):
     pass
 
-class DummySettings(object):
-    def __init__(self):
-        self.A_PRESENT_SETTING = 'hello'
-        self.A_FALSE_SETTING = False
-        self.A_PRESENT_BACKEND_SETTING = 'django_digest.tests.DummyBackendClass'
-        self.SECRET_KEY = 'sekret'
-        self.DIGEST_ENFORCE_NONCE_COUNT = True
-        if hasattr(django_settings, 'DIGEST_REALM'):
-            self.DIGEST_REALM = django_settings.DIGEST_REALM
+DUMMY_SETTINGS = {
+    'SECRET_KEY': 'sekret',
+    'DIGEST_ENFORCE_NONCE_COUNT': NotImplemented,
+    'DIGEST_REALM': NotImplemented,
+    'DIGEST_NONCE_TIMEOUT_IN_SECONDS': NotImplemented,
+    'DIGEST_REQUIRE_AUTHENTICATION': NotImplemented,
+    'DIGEST_LOGIN_FACTORY': NotImplemented,
+    'DIGEST_NONCE_BACKEND': NotImplemented,
+    'DIGEST_ACCOUNT_BACKEND': NotImplemented}
+
+class TestCase(DjangoTestCase):
+    def __call__(self, result=None):
+        with patch(settings, **DUMMY_SETTINGS):
+            return super(TestCase, self).__call__(result)
 
 class UtilsTest(TestCase):
     def test_get_setting(self):
-        settings = DummySettings()
-        self.assertEqual('hello', get_setting(settings, 'A_PRESENT_SETTING', 'blah'))
-        self.assertEqual('blah', get_setting(settings, 'AN_ABSENT_SETTING', 'blah'))
-        self.assertEqual(False, get_setting(settings, 'A_FALSE_SETTING', 'blah'))
+        with patch(settings,
+                   A_PRESENT_SETTING='hello',
+                   AN_ABSENT_SETTING=NotImplemented,
+                   A_FALSE_SETTING=False):
+            self.assertEqual('hello', get_setting('A_PRESENT_SETTING', 'blah'))
+            self.assertEqual('blah', get_setting('AN_ABSENT_SETTING', 'blah'))
+            self.assertEqual(False, get_setting('A_FALSE_SETTING', 'blah'))
 
     def test_get_backend(self):
-        settings = DummySettings()
-        self.assertEqual(DummyBackendClass,
-                         type(get_backend(settings, 'A_PRESENT_BACKEND_SETTING',
-                                          'django_digest.tests.OtherDummyBackendClass')))
-        self.assertEqual(OtherDummyBackendClass,
-                         type(get_backend(settings, 'AN_ABSENT_BACKEND_SETTING',
-                                          'django_digest.tests.OtherDummyBackendClass')))
+        with patch(settings,
+                   A_PRESENT_BACKEND_SETTING='django_digest.tests.DummyBackendClass',
+                   AN_ABSENT_BACKEND_SETTING=NotImplemented):
+            self.assertEqual(
+                DummyBackendClass,
+                type(get_backend('A_PRESENT_BACKEND_SETTING',
+                                 'django_digest.tests.OtherDummyBackendClass')))
+
+            self.assertEqual(
+                OtherDummyBackendClass,
+                type(get_backend('AN_ABSENT_BACKEND_SETTING',
+                                 'django_digest.tests.OtherDummyBackendClass')))
 
 
 class DjangoDigestTests(TestCase):
     def setUp(self):
         self.mocker = Mocker()
-        self.settings = DummySettings()
         
     def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
                             algorithm=None, opaque='dummy-opaque', qop='auth', nonce_count=1,
-                            client_nonce=None, password='password', request_path=None,
-                            settings=None):
-        if settings is None:
-            settings = self.settings
+                            client_nonce=None, password='password', request_path=None):
         if not realm:
-            realm = get_setting(settings, 'DIGEST_REALM', DEFAULT_REALM)
+            realm = get_setting('DIGEST_REALM', DEFAULT_REALM)
         if not nonce:
             nonce=python_digest.calculate_nonce(time.time(), secret=settings.SECRET_KEY)
         if not request_path:
@@ -98,24 +141,30 @@ class DjangoDigestTests(TestCase):
         return request
 
     def test_build_challenge_response(self):
-        response = HttpDigestAuthenticator(settings=self.settings).build_challenge_response()
+        response = HttpDigestAuthenticator().build_challenge_response()
         self.assertEqual(401, response.status_code)
         self.assertEqual('digest ', response["WWW-Authenticate"][:7].lower())
         parts = parse_parts(response["WWW-Authenticate"][7:])
-        self.assertEqual(get_setting(self.settings, 'DIGEST_REALM', DEFAULT_REALM),
-                         parts['realm'])
+        self.assertEqual(DEFAULT_REALM, parts['realm'])
+        with patch(settings, DIGEST_REALM='CUSTOM'):
+            response = HttpDigestAuthenticator().build_challenge_response()
+            parts = parse_parts(response["WWW-Authenticate"][7:])
+            self.assertEqual('CUSTOM', parts['realm'])
 
     def test_decorator_authenticated_with_parens(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
-
+        
         @httpdigest()
         def test_view(request):
             return response
 
-        testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
-        request = self.create_mock_request(username=testuser.username, password='pass',
-                                           settings=django_settings)
+        testuser = User.objects.create_user(username='testuser',
+                                            email='user@example.com',
+                                            password='pass')
+        request = self.create_mock_request(username=testuser.username,
+                                           password='pass')
+        # expect the following assignment:
         request.user = testuser
 
         with self.mocker:
@@ -129,9 +178,11 @@ class DjangoDigestTests(TestCase):
         def test_view(request):
             return response
 
-        testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
-        request = self.create_mock_request(username=testuser.username, password='pass',
-                                           settings=django_settings)
+        testuser = User.objects.create_user(username='testuser',
+                                            email='user@example.com',
+                                            password='pass')
+        request = self.create_mock_request(username=testuser.username,
+                                           password='pass')
         request.user = testuser
 
         with self.mocker:
@@ -148,7 +199,7 @@ class DjangoDigestTests(TestCase):
         testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
         request = self.create_mock_request(username=testuser.username, password='pass',
                                            uri='http://server:8000/some/path?q=v',
-                                           request_path='/some/path', settings=django_settings)
+                                           request_path='/some/path')
         request.user = testuser
 
         with self.mocker:
@@ -163,7 +214,7 @@ class DjangoDigestTests(TestCase):
 
         testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
         request = self.create_mock_request(username=testuser.username, password='pass',
-                                           realm='BAD_REALM', settings=django_settings)
+                                           realm='BAD_REALM')
 
         with self.mocker:
             final_response = test_view(request)
@@ -207,33 +258,36 @@ class DjangoDigestTests(TestCase):
             self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
 
     def test_disable_nonce_count_enforcement(self):
-        self.settings.DIGEST_ENFORCE_NONCE_COUNT = False
-        testuser = User.objects.create_user(username='testuser', 
-                                            email='user@example.com',
-                                            password='pass')
+        with patch(settings, DIGEST_ENFORCE_NONCE_COUNT=False):
+            testuser = User.objects.create_user(username='testuser', 
+                                                email='user@example.com',
+                                                password='pass')
+    
+            nonce=python_digest.calculate_nonce(time.time(),
+                                                secret=settings.SECRET_KEY)
+    
+            first_request = self.create_mock_request(
+                username=testuser.username, password='pass', nonce=nonce)
 
-        nonce=python_digest.calculate_nonce(time.time(), secret=self.settings.SECRET_KEY)
+            first_request.user = testuser
+            
+            # same nonce, same nonce count, will succeed
+            second_request = self.create_mock_request(
+                username=testuser.username, password='pass', nonce=nonce)
+            second_request.user = testuser
 
-        first_request = self.create_mock_request(username=testuser.username,
-                                                 password='pass', nonce=nonce,
-                                                 settings=self.settings)
-        first_request.user = testuser
-        
-        # same nonce, same nonce count, will succeed
-        second_request = self.create_mock_request(username=testuser.username,
-                                                  password='pass', nonce=nonce,
-                                                  settings=self.settings)
-        second_request.user = testuser
-        with self.mocker:
-            authenticator = HttpDigestAuthenticator(settings=self.settings)
-            self.assertTrue(authenticator.authenticate(first_request))
-            self.assertTrue(authenticator.authenticate(second_request))
+            with self.mocker:
+                authenticator = HttpDigestAuthenticator()
+                self.assertTrue(authenticator.authenticate(first_request))
+                self.assertTrue(authenticator.authenticate(second_request))
 
     def test_authenticate(self):
-        testuser = User.objects.create_user('testuser', 'user@example.com', 'pass')
-        otheruser = User.objects.create_user('otheruser', 'otheruser@example.com', 'pass')
+        testuser = User.objects.create_user(
+            username='testuser', email='user@example.com', password='pass')
+        otheruser = User.objects.create_user(
+            username='otheruser', email='otheruser@example.com', password='pass')
 
-        nonce=python_digest.calculate_nonce(time.time(), secret=self.settings.SECRET_KEY)
+        nonce=python_digest.calculate_nonce(time.time(), secret=settings.SECRET_KEY)
 
         first_request = self.create_mock_request(username=testuser.username,
                                                  password='pass', nonce=nonce)
@@ -250,7 +304,8 @@ class DjangoDigestTests(TestCase):
         third_request.user = testuser
 
         # an invalid request
-        fourth_request = self.create_mock_request_for_header('Digest blah blah blah')
+        fourth_request = self.create_mock_request_for_header(
+            'Digest blah blah blah')
 
         # an invalid request
         fifth_request = self.create_mock_request_for_header(None)
@@ -262,36 +317,40 @@ class DjangoDigestTests(TestCase):
 
         # an invalid request digest (wrong password)
         seventh_request = self.create_mock_request(
-            username=testuser.username, password='wrong', nonce=nonce, nonce_count=3)
+            username=testuser.username, password='wrong', nonce=nonce,
+            nonce_count=3)
 
         # attack attempts / failures don't invalidate the session or increment nonce_cont
-        eighth_request = self.create_mock_request(username=testuser.username,
-                                                  password='pass', nonce=nonce, nonce_count=3)
+        eighth_request = self.create_mock_request(
+            username=testuser.username, password='pass', nonce=nonce,
+            nonce_count=3)
         eighth_request.user = testuser
 
         # mismatched URI
-        ninth_request = self.create_mock_request(username=testuser.username, nonce=nonce,
-                                                 password='pass', nonce_count=4,
-                                                 request_path='/different/path')
+        ninth_request = self.create_mock_request(
+            username=testuser.username, nonce=nonce, password='pass',
+            nonce_count=4, request_path='/different/path')
 
         # stale nonce
         tenth_request = self.create_mock_request(
             username=testuser.username, password='pass', nonce_count=4,
-            nonce=python_digest.calculate_nonce(time.time()-60000,
-                                                secret=self.settings.SECRET_KEY))
+            nonce=python_digest.calculate_nonce(
+                time.time()-60000, secret=settings.SECRET_KEY))
 
         # once the nonce is used by one user, can't be reused by another
-        eleventh_request = self.create_mock_request(username=otheruser.username,
-                                                  password='pass', nonce=nonce, nonce_count=4)
+        eleventh_request = self.create_mock_request(
+            username=otheruser.username, password='pass', nonce=nonce,
+            nonce_count=4)
 
         # if the partial digest is not in the DB, authentication fails
         twelfth_request = self.create_mock_request(username=testuser.username,
                                                    password='pass', nonce_count=3)
         
         # a request for Basic auth
-        thirteenth_request = self.create_mock_request_for_header('Basic YmxhaDpibGFo')
+        thirteenth_request = self.create_mock_request_for_header(
+            'Basic YmxhaDpibGFo')
 
-        authenticator = HttpDigestAuthenticator(settings=self.settings)
+        authenticator = HttpDigestAuthenticator()
         with self.mocker:
             self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(first_request))
             self.assertTrue(authenticator.authenticate(first_request))
@@ -310,23 +369,135 @@ class DjangoDigestTests(TestCase):
             self.assertFalse(authenticator.authenticate(twelfth_request))
             self.assertFalse(authenticator.authenticate(thirteenth_request))
 
+class DummyLoginFactory(object):
+    confirmed_logins = []
+    unconfirmed_logins = []
+
+    def confirmed_logins_for_user(self, user):
+        return self.confirmed_logins
+
+    def unconfirmed_logins_for_user(self, user):
+        return self.unconfirmed_logins
+
 class ModelsTests(TestCase):
+    def test_unconfirmed_partial_digests(self):
+        with patch(settings,
+                   DIGEST_LOGIN_FACTORY='django_digest.tests.DummyLoginFactory'):
+            with patch(DummyLoginFactory, confirmed_logins=['user', 'wierdo'],
+                       unconfirmed_logins=['email@example.com', 'other@example.com']):
+                user = User.objects.create_user(username='TestUser',
+                                                password='password',
+                                                email='TestUser@Example.com')
+            self.assertEqual(
+                set(['user', 'wierdo']),
+                set([pd.login
+                     for pd in PartialDigest.objects.filter(confirmed=True)]))
+            user_pd = PartialDigest.objects.get(login='user').partial_digest
+    
+            self.assertEqual(
+                set(['email@example.com', 'other@example.com']),
+                set([pd.login
+                     for pd in PartialDigest.objects.filter(confirmed=False)]))
+            email_pd = PartialDigest.objects.get(
+                login='email@example.com').partial_digest
+    
+            with patch(DummyLoginFactory,
+                       confirmed_logins=['user', 'email@example.com'],
+                       unconfirmed_logins=['wierdo']):
+                from django_digest.backend.db import review_partial_digests
+                review_partial_digests(user)
+    
+            self.assertEqual(
+                set(['user', 'email@example.com']),
+                set([pd.login
+                     for pd in PartialDigest.objects.filter(confirmed=True)]))
+    
+            self.assertEqual(
+                set(['wierdo']),
+                set([pd.login
+                     for pd in PartialDigest.objects.filter(confirmed=False)]))
+            self.assertEqual(user_pd,
+                             PartialDigest.objects.get(login='user').partial_digest)
+            self.assertEqual(
+                email_pd,
+                PartialDigest.objects.get(login='email@example.com').partial_digest)
+
+
     def test_partial_digest_creation_on_set_password(self):
-        user = User.objects.create(username='testuser', email='testuser@example.com')
-        self.assertEqual(0,PartialDigest.objects.count())
+        user = User.objects.create_user(username='TestUser', password='password',
+                                        email='TestUser@Example.com')
+        expected = ['testuser', 'TestUser', 'testuser@example.com']
+
+        # In Django < 1.2 the local name on emails is lowercased by create_user, so
+        # expectations will be different for Django >= 1.2
+        if user.email == 'TestUser@example.com':
+            expected += [user.email]
+            
+        self.assertEqual(
+            set(expected),
+            set([pd.login for pd in PartialDigest.objects.all()]))
+
+    def test_partial_digest_update_after_email_case_change(self):
+        user = User.objects.create(username='TestUser', email='TestUser@example.com')
         user.set_password('password')
-        self.assertEqual(0,PartialDigest.objects.count())
         user.save()
-        self.assertEqual(1,PartialDigest.objects.count())
+        expected = ['testuser', 'TestUser', 'TestUser@example.com',
+                    'testuser@example.com']
+
+        self.assertEqual(
+            set(expected),
+            set([pd.login for pd in PartialDigest.objects.all()]))
+        user.email = 'tESTuSER@example.com'
+        user.save()
+        from django.contrib.auth import authenticate
+        self.assertEqual(user,
+                         authenticate(username='TestUser', password='password'))
+        self.assertEqual(
+            set(['testuser', 'TestUser', 'testuser@example.com',
+                 'tESTuSER@example.com']),
+            set([pd.login for pd in PartialDigest.objects.all()]))
 
     def test_partial_digest_creation_on_login(self):
-        user = User.objects.create_user(username='testuser', password='password',
+        user = User.objects.create_user(username='TestUser', password='password',
                                         email='testuser@example.com')
-        PartialDigest.objects.get(user=user).delete()
+        PartialDigest.objects.filter(user=user).delete()
         self.assertEqual(0,PartialDigest.objects.count())
         from django.contrib.auth import authenticate
-        self.assertEqual(user, authenticate(username='testuser', password='password'))
-        self.assertEqual(1,PartialDigest.objects.count())
+        self.assertEqual(user, authenticate(username='TestUser', password='password'))
+        self.assertEqual(
+            set(['testuser', 'TestUser', 'testuser@example.com']),
+            set([pd.login for pd in PartialDigest.objects.all()]))
+        pks = [pd.pk for pd in PartialDigest.objects.all()]
+        self.assertEqual(user, authenticate(username='TestUser', password='password'))
+        # Ensure that the partial digests were not regenerated
+        self.assertEqual(set(pks), set([pd.pk for pd in PartialDigest.objects.all()]))
+
+    def test_partial_digest_creation_on_login_after_email_case_change(self):
+        user = User.objects.create_user(username='TestUser', password='password',
+                                        email='testuser@example.com')
+        PartialDigest.objects.filter(user=user).delete()
+        self.assertEqual(0,PartialDigest.objects.count())
+        from django.contrib.auth import authenticate
+        self.assertEqual(user, authenticate(username='TestUser', password='password'))
+        self.assertEqual(
+            set(['testuser', 'TestUser', 'testuser@example.com']),
+            set([pd.login for pd in PartialDigest.objects.all()]))
+        pks = [pd.pk for pd in PartialDigest.objects.all()]
+        self.assertEqual(user, authenticate(username='TestUser', password='password'))
+        # Ensure that the partial digests were not regenerated
+        self.assertEqual(set(pks), set([pd.pk for pd in PartialDigest.objects.all()]))
+
+        # Ensure that a case-only change in the email address does cause a
+        # regeneration on login
+        user.email = 'testUser@Example.com'
+        user.save()
+        self.assertEqual(user, authenticate(username='TestUser', password='password'))
+        self.assertEqual(
+            set(['testuser', 'TestUser', 'testuser@example.com',
+                 'testUser@Example.com']),
+            set([pd.login for pd in PartialDigest.objects.all()]))
+
+
 
 class MiddlewareTests(TestCase):
     def setUp(self):
@@ -411,18 +582,46 @@ class MiddlewareTests(TestCase):
                     request, response))
 
 class DbBackendTests(TestCase):
+    def test_filter_out_inactive_users(self):
+        user1 = User.objects.create(username='user1', email='user1@example.com',
+                                    is_active=False)
+        self.assertTrue(AccountStorage().get_partial_digest(user1.username)
+                        is None)
+        self.assertTrue(AccountStorage().get_user(user1.username) is None)
+        user1.set_password('password')
+        user1.save()
+        self.assertTrue(AccountStorage().get_partial_digest(user1.username)
+                        is None)
+        self.assertTrue(AccountStorage().get_user(user1.username) is None)
+        user1.is_active = True
+        user1.save()
+        self.assertTrue(AccountStorage().get_partial_digest(user1.username)
+                        is not None)
+        self.assertTrue(AccountStorage().get_user(user1.username) is not None)
+
     def test_get_partial_digest(self):
         user1 = User.objects.create(username='user1', email='user1@example.com')
-        user2 = User.objects.create_user(username='user2', email='user2@example.com',
+        user2 = User.objects.create_user(username='User2', email='user2@example.com',
                                          password='pass')
         self.assertEqual(None, AccountStorage().get_partial_digest(user1.username))
-        self.assertTrue(AccountStorage().get_partial_digest(user2.username) is not None)
+        username_pd = AccountStorage().get_partial_digest(user2.username) 
+        lowercase_username_pd = AccountStorage().get_partial_digest(
+            user2.username.lower()) 
+        email_pd = AccountStorage().get_partial_digest(user2.email) 
+        self.assertTrue(username_pd is not None)
+        self.assertTrue(lowercase_username_pd is not None)
+        self.assertTrue(email_pd is not None)
+        self.assertFalse(username_pd == email_pd)
+        self.assertFalse(lowercase_username_pd == username_pd)
         self.assertEqual(None, AccountStorage().get_partial_digest('user3'))
 
     def test_get_user(self):
-        user1 = User.objects.create(username='user1', email='user1@example.com')
+        user1 = User.objects.create_user(username='User1', email='user1@example.com',
+                                         password='pass')
         user2 = User.objects.create_user(username='user2', email='user2@example.com',
                                          password='pass')
+        self.assertFalse(user1.username == user1.username.lower())
         self.assertEqual(user1, AccountStorage().get_user(user1.username))
+        self.assertEqual(user1, AccountStorage().get_user(user1.username.lower()))
         self.assertEqual(user2, AccountStorage().get_user(user2.username))
         self.assertEqual(None, AccountStorage().get_user('user3'))
