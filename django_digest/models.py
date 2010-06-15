@@ -2,7 +2,6 @@ import md5
 
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
-from django.contrib.auth.backends import ModelBackend
 from django.db import models
 from django.db.models.signals import post_save
 
