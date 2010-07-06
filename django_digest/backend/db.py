@@ -18,8 +18,8 @@ from django_digest.backend.storage import AccountStorage, NonceStorage
 
 class MultiDb(object):
     def __init__(self, using=DEFAULT_DB_ALIAS, create=False):
-        self.created = create
-        if self.created and not self.is_test_mode():
+        self.created = create and not self.is_test_mode()
+        if self.created:
             self.connection = self.create_connection(using=using)
         else:
             self.connection = db.connections[using]
@@ -59,7 +59,7 @@ class MultiDb(object):
 class FakeMultiDb(MultiDb):
     """For Django < 1.2."""
     def __init__(self):
-        self.created = True
+        self.created = not self.is_test_mode()
         self.connection = self.create_connection()
         self.init_signals()
 

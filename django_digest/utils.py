@@ -32,8 +32,6 @@ def get_backend(setting_name, default_backend_class_path):
     return cls()
 
 def get_default_db():
-    from django_digest.backend.db import FakeMultiDb
-    get_default_db._cache = FakeMultiDb()
     if not get_default_db._cache:
         try:
             import django.db.connections
