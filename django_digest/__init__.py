@@ -11,7 +11,18 @@ import python_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
+# Make sure a NullHandler is available
+# This was added in Python 2.7/3.2
+try:
+    from logging import NullHandler
+except ImportError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+
 _l = logging.getLogger(__name__)
+_l.addHandler(NullHandler())
+_l.setLevel(logging.DEBUG)
 
 class DefaultLoginFactory(object):
     def confirmed_logins_for_user(self, user):
