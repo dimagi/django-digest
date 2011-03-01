@@ -48,6 +48,8 @@ def _store_partial_digests(user):
                                      partial_digest=partial_digest)
 
 def _prepare_partial_digests(user, raw_password):
+    if raw_password is None:
+        return
     realm = get_setting('DIGEST_REALM', DEFAULT_REALM)
     partial_digests = []
     for (confirmed, factory_method) in ((True, _confirmed_logins),
