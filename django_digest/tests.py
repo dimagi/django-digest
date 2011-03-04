@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from django.test import TestCase as DjangoTestCase
+from django.test import TestCase, TransactionTestCase
 
 from contextlib import contextmanager
 import time
@@ -11,6 +11,7 @@ from python_digest.utils import parse_parts
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.http import HttpRequest
 from django.utils.functional import LazyObject
 
@@ -69,10 +70,20 @@ DUMMY_SETTINGS = {
     'DIGEST_NONCE_BACKEND': NotImplemented,
     'DIGEST_ACCOUNT_BACKEND': NotImplemented}
 
-class TestCase(DjangoTestCase):
+class SettingsMixin(object):
+    def __init__(self, *args, **kwargs):
+        # Bind self.TestCase to the actual TestCase superclass
+        self.superclass = None
+        for cls in self.__class__.__bases__:
+            if issubclass(cls, (TestCase, TransactionTestCase)):
+                self.superclass = cls
+        if not self.superclass:
+            raise SyntaxError('SettingsMixin must be combined with a TestCase')
+        super(SettingsMixin, self).__init__(*args, **kwargs)
+
     def __call__(self, result=None):
         with patch(settings, **DUMMY_SETTINGS):
-            return super(TestCase, self).__call__(result)
+            return self.superclass.__call__(self, result)
 
 class UtilsTest(TestCase):
     def test_get_setting(self):
@@ -99,10 +110,10 @@ class UtilsTest(TestCase):
                                  'django_digest.tests.OtherDummyBackendClass')))
 
 
-class DjangoDigestTests(TestCase):
+class MockRequestMixin(object):
     def setUp(self):
         self.mocker = Mocker()
-        
+    
     def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
                             algorithm=None, opaque='dummy-opaque', qop='auth', nonce_count=1,
@@ -140,6 +151,8 @@ class DjangoDigestTests(TestCase):
 
         return request
 
+
+class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
     def test_build_challenge_response(self):
         response = HttpDigestAuthenticator().build_challenge_response()
         self.assertEqual(401, response.status_code)
@@ -281,7 +294,9 @@ class DjangoDigestTests(TestCase):
                 self.assertTrue(authenticator.authenticate(first_request))
                 self.assertTrue(authenticator.authenticate(second_request))
 
-    def test_authenticate(self):
+class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
+                                         TransactionTestCase):
+    def test_authenticate_nonce(self):
         testuser = User.objects.create_user(
             username='testuser', email='user@example.com', password='pass')
         otheruser = User.objects.create_user(
@@ -303,6 +318,28 @@ class DjangoDigestTests(TestCase):
                                                  nonce_count=2)
         third_request.user = testuser
 
+        authenticator = HttpDigestAuthenticator()
+        with self.mocker:
+            self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
+                first_request
+            ))
+            with transaction.commit_on_success():
+                self.assertTrue(authenticator.authenticate(first_request))
+                self.assertFalse(authenticator.authenticate(second_request))
+                transaction.rollback()
+                self.assertTrue(authenticator.authenticate(third_request))
+
+class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
+    def test_authenticate_invalid(self):
+        testuser = User.objects.create_user(username='testuser',
+                                            email='user@example.com',
+                                            password='pass')
+        otheruser = User.objects.create_user(username='otheruser',
+                                             email='otheruser@example.com',
+                                             password='pass')
+
+        nonce=python_digest.calculate_nonce(time.time(),
+                                            secret=settings.SECRET_KEY)
         # an invalid request
         fourth_request = self.create_mock_request_for_header(
             'Digest blah blah blah')
@@ -342,20 +379,8 @@ class DjangoDigestTests(TestCase):
             username=otheruser.username, password='pass', nonce=nonce,
             nonce_count=4)
 
-        # if the partial digest is not in the DB, authentication fails
-        twelfth_request = self.create_mock_request(username=testuser.username,
-                                                   password='pass', nonce_count=3)
-        
-        # a request for Basic auth
-        thirteenth_request = self.create_mock_request_for_header(
-            'Basic YmxhaDpibGFo')
-
         authenticator = HttpDigestAuthenticator()
         with self.mocker:
-            self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(first_request))
-            self.assertTrue(authenticator.authenticate(first_request))
-            self.assertFalse(authenticator.authenticate(second_request))
-            self.assertTrue(authenticator.authenticate(third_request))
             self.assertFalse(authenticator.authenticate(fourth_request))
             self.assertFalse(authenticator.authenticate(fifth_request))
             self.assertFalse(authenticator.authenticate(sixth_request))
@@ -365,8 +390,33 @@ class DjangoDigestTests(TestCase):
             self.assertFalse(authenticator.authenticate(tenth_request))
             self.assertFalse(authenticator.authenticate(eleventh_request))
 
+    def test_authenticate_missing(self):
+        testuser = User.objects.create_user(username='testuser',
+                                            email='user@example.com',
+                                            password='pass')
+        otheruser = User.objects.create_user(username='otheruser',
+                                             email='otheruser@example.com',
+                                             password='pass')
+
+        nonce=python_digest.calculate_nonce(time.time(),
+                                            secret=settings.SECRET_KEY)
+        # if the partial digest is not in the DB, authentication fails
+        twelfth_request = self.create_mock_request(username=testuser.username,
+                                                   password='pass',
+                                                   nonce_count=3)
+
+        authenticator = HttpDigestAuthenticator()
+        with self.mocker:
             PartialDigest.objects.all().delete()
             self.assertFalse(authenticator.authenticate(twelfth_request))
+
+    def test_authenticate_basic(self):
+        # a request for Basic auth
+        thirteenth_request = self.create_mock_request_for_header(
+            'Basic YmxhaDpibGFo')
+
+        authenticator = HttpDigestAuthenticator()
+        with self.mocker:
             self.assertFalse(authenticator.authenticate(thirteenth_request))
 
 class DummyLoginFactory(object):
@@ -499,7 +549,7 @@ class ModelsTests(TestCase):
 
 
 
-class MiddlewareTests(TestCase):
+class MiddlewareTests(SettingsMixin, TestCase):
     def setUp(self):
         self.mocker = Mocker()
 
