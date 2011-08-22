@@ -4,6 +4,7 @@ from django.db import IntegrityError
 
 from django_digest.models import PartialDigest
 from django_digest.utils import get_default_db
+import logging
 
 try:
     from logging import NullHandler
