@@ -5,6 +5,12 @@ from django.db import IntegrityError
 from django_digest.models import PartialDigest
 from django_digest.utils import get_default_db
 
+try:
+    from logging import NullHandler
+except ImportError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
 
 _l = logging.getLogger(__name__)
 _l.addHandler(NullHandler())
