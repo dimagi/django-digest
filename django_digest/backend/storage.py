@@ -6,6 +6,10 @@ from django_digest.models import PartialDigest
 from django_digest.utils import get_default_db
 
 
+_l = logging.getLogger(__name__)
+_l.addHandler(NullHandler())
+_l.setLevel(logging.DEBUG)
+
 class AccountStorage(object):
     GET_PARTIAL_DIGEST_QUERY = """
     SELECT django_digest_partialdigest.login, django_digest_partialdigest.partial_digest
