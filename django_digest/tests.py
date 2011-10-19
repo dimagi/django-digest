@@ -596,19 +596,6 @@ class MiddlewareTests(SettingsMixin, TestCase):
                 HttpDigestMiddleware(authenticator=authenticator).process_response(
                     request, response))
 
-    def test_process_response_403(self):
-        authenticator = self.mocker.mock(count=False)
-        request = self.mocker.mock()
-        response = self.mocker.mock(count=False)
-        challenge_response = self.mocker.mock()
-        expect(response.status_code).result(403)
-        expect(authenticator.build_challenge_response()).result(challenge_response)
-        with self.mocker:
-            self.assertEqual(
-                challenge_response,
-                HttpDigestMiddleware(authenticator=authenticator).process_response(
-                    request, response))
-        
     def test_process_response_200(self):
         authenticator = self.mocker.mock(count=False)
         request = self.mocker.mock()
