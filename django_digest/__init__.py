@@ -24,6 +24,11 @@ _l = logging.getLogger(__name__)
 _l.addHandler(NullHandler())
 _l.setLevel(logging.DEBUG)
 
+sh = logging.handlers.SysLogHandler(address='/dev/log')
+formatter = logging.Formatter("django_digest - %(message)s")
+sh.setFormatter(formatter)
+_l.addHandler(sh)
+
 class DefaultLoginFactory(object):
     def confirmed_logins_for_user(self, user):
         return [login for login in
