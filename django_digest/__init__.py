@@ -45,7 +45,8 @@ class HttpDigestAuthenticator(object):
                  nonce_storage=None,
                  realm=None,
                  timeout=None,
-                 enforce_nonce_count=None):
+                 enforce_nonce_count=None,
+                 failure_callback=None):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
@@ -57,6 +58,7 @@ class HttpDigestAuthenticator(object):
         self._nonce_storage = (nonce_storage or get_backend(
                 'DIGEST_NONCE_BACKEND', 'django_digest.backend.db.NonceStorage'))
         self.secret_key = get_setting('SECRET_KEY')
+        self.failure_callback = failure_callback
 
     @staticmethod
     def contains_digest_credentials(request):
@@ -111,6 +113,8 @@ class HttpDigestAuthenticator(object):
         if not calculated_request_digest == digest_response.response:
             _l.debug('authentication failure: supplied request digest does not match ' \
                          'calculated request digest.')
+            if self.failure_callback:
+                self.failure_callback(request, digest_response.username)
             return False
 
         if not python_digest.validate_uri(digest_response.uri, request.path):
