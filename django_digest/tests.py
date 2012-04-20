@@ -662,3 +662,11 @@ class DbBackendTests(TestCase):
         self.assertEqual(user1, AccountStorage().get_user(user1.username.lower()))
         self.assertEqual(user2, AccountStorage().get_user(user2.username))
         self.assertEqual(None, AccountStorage().get_user('user3'))
+
+    def test_multiple_partial_digests(self):
+        user = User.objects.create_user(username='user',
+                                        email='user@example.com',
+                                        password='pass')
+        PartialDigest.objects.create(user=user, login=user.username,
+                                     confirmed=True, partial_digest='foo')
+        self.assertEqual(AccountStorage().get_user(user.username), None)
