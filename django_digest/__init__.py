@@ -54,9 +54,9 @@ class HttpDigestAuthenticator(object):
         self.realm = realm or get_setting('DIGEST_REALM', DEFAULT_REALM)
         self.timeout = timeout or get_setting('DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
         self._account_storage = (account_storage or get_backend(
-                'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.db.AccountStorage'))
+                'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.storage.AccountStorage'))
         self._nonce_storage = (nonce_storage or get_backend(
-                'DIGEST_NONCE_BACKEND', 'django_digest.backend.db.NonceStorage'))
+                'DIGEST_NONCE_BACKEND', 'django_digest.backend.storage.NonceStorage'))
         self.secret_key = get_setting('SECRET_KEY')
         self.failure_callback = failure_callback
 

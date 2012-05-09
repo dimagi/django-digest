@@ -16,7 +16,7 @@ from django.http import HttpRequest
 from django.utils.functional import LazyObject
 
 from django_digest import HttpDigestAuthenticator
-from django_digest.backend.db import AccountStorage
+from django_digest.backend.storage import AccountStorage
 from django_digest.decorators import httpdigest
 from django_digest.middleware import HttpDigestMiddleware
 from django_digest.models import PartialDigest
@@ -454,8 +454,8 @@ class ModelsTests(TestCase):
             with patch(DummyLoginFactory,
                        confirmed_logins=['user', 'email@example.com'],
                        unconfirmed_logins=['wierdo']):
-                from django_digest.backend.db import review_partial_digests
-                review_partial_digests(user)
+                from django_digest.models import _review_partial_digests
+                _review_partial_digests(user)
     
             self.assertEqual(
                 set(['user', 'email@example.com']),
