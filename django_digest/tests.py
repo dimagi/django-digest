@@ -1,5 +1,6 @@
 from __future__ import with_statement
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
+from django.test import TransactionTestCase as DjangoTransactionTestCase
 
 from contextlib import contextmanager
 import time
@@ -84,6 +85,15 @@ class SettingsMixin(object):
     def __call__(self, result=None):
         with patch(settings, **DUMMY_SETTINGS):
             return self.superclass.__call__(self, result)
+
+class TransactionTestCase(DjangoTransactionTestCase):
+    """
+    Works around Django issue 10827 by clearing the ContentType cache
+    before permissions are setup.
+    """
+    def _pre_setup(self, *args, **kwargs):
+        ContentType.objects.clear_cache()
+        super(TransactionTestCase, self)._pre_setup(*args, **kwargs)
 
 class UtilsTest(TestCase):
     def test_get_setting(self):
