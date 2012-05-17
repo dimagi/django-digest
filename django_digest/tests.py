@@ -1,4 +1,5 @@
 from __future__ import with_statement
+from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from django.test import TransactionTestCase as DjangoTransactionTestCase
 
