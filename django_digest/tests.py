@@ -442,6 +442,7 @@ class DummyLoginFactory(object):
 
 class ModelsTests(TestCase):
     def test_unconfirmed_partial_digests(self):
+        PartialDigest.objects.all().delete()
         with patch(settings,
                    DIGEST_LOGIN_FACTORY='django_digest.tests.DummyLoginFactory'):
             with patch(DummyLoginFactory, confirmed_logins=['user', 'wierdo'],
@@ -485,6 +486,7 @@ class ModelsTests(TestCase):
 
 
     def test_partial_digest_creation_on_set_password(self):
+        PartialDigest.objects.all().delete()
         user = User.objects.create_user(username='TestUser', password='password',
                                         email='TestUser@Example.com')
         expected = ['testuser', 'TestUser', 'testuser@example.com']
@@ -499,6 +501,7 @@ class ModelsTests(TestCase):
             set([pd.login for pd in PartialDigest.objects.all()]))
 
     def test_partial_digest_update_after_email_case_change(self):
+        PartialDigest.objects.all().delete()
         user = User.objects.create(username='TestUser', email='TestUser@example.com')
         user.set_password('password')
         user.save()
@@ -521,7 +524,7 @@ class ModelsTests(TestCase):
     def test_partial_digest_creation_on_login(self):
         user = User.objects.create_user(username='TestUser', password='password',
                                         email='testuser@example.com')
-        PartialDigest.objects.filter(user=user).delete()
+        PartialDigest.objects.all().delete()
         self.assertEqual(0,PartialDigest.objects.count())
         from django.contrib.auth import authenticate
         self.assertEqual(user, authenticate(username='TestUser', password='password'))
@@ -536,7 +539,7 @@ class ModelsTests(TestCase):
     def test_partial_digest_creation_on_login_after_email_case_change(self):
         user = User.objects.create_user(username='TestUser', password='password',
                                         email='testuser@example.com')
-        PartialDigest.objects.filter(user=user).delete()
+        PartialDigest.objects.all().delete()
         self.assertEqual(0,PartialDigest.objects.count())
         from django.contrib.auth import authenticate
         self.assertEqual(user, authenticate(username='TestUser', password='password'))
