@@ -2,10 +2,7 @@ import logging
 import random
 import time
 
-from django.core import exceptions
-        
-from django.http import HttpRequest, HttpResponse
-from django.utils.importlib import import_module
+from django.http import HttpResponse
 
 import python_digest
 

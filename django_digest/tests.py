@@ -310,7 +310,7 @@ class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
     def test_authenticate_nonce(self):
         testuser = User.objects.create_user(
             username='testuser', email='user@example.com', password='pass')
-        otheruser = User.objects.create_user(
+        User.objects.create_user(
             username='otheruser', email='otheruser@example.com', password='pass')
 
         nonce=python_digest.calculate_nonce(time.time(), secret=settings.SECRET_KEY)
@@ -405,12 +405,11 @@ class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
         testuser = User.objects.create_user(username='testuser',
                                             email='user@example.com',
                                             password='pass')
-        otheruser = User.objects.create_user(username='otheruser',
-                                             email='otheruser@example.com',
-                                             password='pass')
+        User.objects.create_user(username='otheruser',
+                                 email='otheruser@example.com',
+                                 password='pass')
 
-        nonce=python_digest.calculate_nonce(time.time(),
-                                            secret=settings.SECRET_KEY)
+        python_digest.calculate_nonce(time.time(), secret=settings.SECRET_KEY)
         # if the partial digest is not in the DB, authentication fails
         twelfth_request = self.create_mock_request(username=testuser.username,
                                                    password='pass',
