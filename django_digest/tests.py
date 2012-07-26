@@ -1,12 +1,13 @@
 from __future__ import with_statement
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase
+from django.test import TestCase as DjangoTestCase
 from django.test import TransactionTestCase as DjangoTransactionTestCase
 
 from contextlib import contextmanager
 import time
 
 from mocker import Mocker, expect
+from testfixtures import LogCapture
 
 import python_digest
 from python_digest.utils import parse_parts
@@ -87,7 +88,20 @@ class SettingsMixin(object):
         with patch(settings, **DUMMY_SETTINGS):
             return self.superclass.__call__(self, result)
 
-class TransactionTestCase(DjangoTransactionTestCase):
+class LogCaptureMixin(object):
+    """Prevents logging to the system logger during test."""
+    def setUp(self, *args, **kwargs):
+        super(LogCaptureMixin, self).setUp(*args, **kwargs)
+        self.logcapture = LogCapture('django_digest')
+
+    def tearDown(self, *args, **kwargs):
+        self.logcapture.uninstall()
+        super(LogCaptureMixin, self).tearDown(*args, **kwargs)
+
+class TestCase(LogCaptureMixin, DjangoTestCase):
+    pass
+
+class TransactionTestCase(LogCaptureMixin, DjangoTransactionTestCase):
     """
     Works around Django issue 10827 by clearing the ContentType cache
     before permissions are setup.
@@ -122,7 +136,8 @@ class UtilsTest(TestCase):
 
 
 class MockRequestMixin(object):
-    def setUp(self):
+    def setUp(self, *args, **kwargs):
+        super(MockRequestMixin, self).setUp(*args, **kwargs)
         self.mocker = Mocker()
     
     def create_mock_request(self, username='dummy-username', realm=None,
@@ -563,7 +578,8 @@ class ModelsTests(TestCase):
 
 
 class MiddlewareTests(SettingsMixin, TestCase):
-    def setUp(self):
+    def setUp(self, *args, **kwargs):
+        super(MiddlewareTests, self).setUp(*args, **kwargs)
         self.mocker = Mocker()
 
     def test_valid_login(self):
