@@ -36,7 +36,7 @@ class DefaultLoginFactory(object):
         return []
 
 class HttpDigestAuthenticator(object):
-    
+
     def __init__(self,
                  account_storage=None,
                  nonce_storage=None,
@@ -88,7 +88,7 @@ class HttpDigestAuthenticator(object):
             _l.debug('authentication failure: supplied digest credentials could not be ' \
                          'parsed: "%s".' % request.META['HTTP_AUTHORIZATION'])
             return False
-        
+
         if not digest_response.realm == self.realm:
             _l.debug('authentication failure: supplied realm "%s" does not match ' \
                          'configured realm "%s".' % ( digest_response.realm, self.realm))
@@ -136,7 +136,7 @@ class HttpDigestAuthenticator(object):
 
         request.user = user
         return True
-            
+
     def build_challenge_response(self, stale=False):
         response = HttpResponse('Authorization Required',
                                 content_type='text/plain', status=401)
