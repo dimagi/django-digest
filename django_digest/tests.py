@@ -682,4 +682,4 @@ class DbBackendTests(TestCase):
                                         password='pass')
         PartialDigest.objects.create(user=user, login=user.username,
                                      confirmed=True, partial_digest='foo')
-        self.assertEqual(AccountStorage().get_user(user.username), None)gs
+        self.assertEqual(AccountStorage().get_user(user.username), None)
