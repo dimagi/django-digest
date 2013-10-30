@@ -1,13 +1,12 @@
 from __future__ import with_statement
 from django.contrib.contenttypes.models import ContentType
-from django.test import TestCase as DjangoTestCase
+from django.test import TestCase
 from django.test import TransactionTestCase as DjangoTransactionTestCase
 
 from contextlib import contextmanager
 import time
 
 from mocker import Mocker, expect
-from testfixtures import LogCapture
 
 import python_digest
 from python_digest.utils import parse_parts
@@ -28,7 +27,7 @@ from django_digest.utils import get_setting, get_backend, DEFAULT_REALM
 @contextmanager
 def patch(namespace, **values):
     """Patches `namespace`.`name` with `value` for (name, value) in values"""
-    
+
     originals = {}
 
     if isinstance(namespace, LazyObject):
@@ -55,7 +54,7 @@ def patch(namespace, **values):
                 if values[name] is not NotImplemented:
                     delattr(namespace, name)
             else:
-                setattr(namespace, name, original_value) 
+                setattr(namespace, name, original_value)
 
 class DummyBackendClass(object):
     pass
@@ -88,20 +87,7 @@ class SettingsMixin(object):
         with patch(settings, **DUMMY_SETTINGS):
             return self.superclass.__call__(self, result)
 
-class LogCaptureMixin(object):
-    """Prevents logging to the system logger during test."""
-    def setUp(self, *args, **kwargs):
-        super(LogCaptureMixin, self).setUp(*args, **kwargs)
-        self.logcapture = LogCapture('django_digest')
-
-    def tearDown(self, *args, **kwargs):
-        self.logcapture.uninstall()
-        super(LogCaptureMixin, self).tearDown(*args, **kwargs)
-
-class TestCase(LogCaptureMixin, DjangoTestCase):
-    pass
-
-class TransactionTestCase(LogCaptureMixin, DjangoTransactionTestCase):
+class TransactionTestCase(DjangoTransactionTestCase):
     """
     Works around Django issue 10827 by clearing the ContentType cache
     before permissions are setup.
@@ -136,10 +122,9 @@ class UtilsTest(TestCase):
 
 
 class MockRequestMixin(object):
-    def setUp(self, *args, **kwargs):
-        super(MockRequestMixin, self).setUp(*args, **kwargs)
+    def setUp(self):
         self.mocker = Mocker()
-    
+
     def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
                             algorithm=None, opaque='dummy-opaque', qop='auth', nonce_count=1,
@@ -193,7 +178,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
     def test_decorator_authenticated_with_parens(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
-        
+
         @httpdigest()
         def test_view(request):
             return response
@@ -208,7 +193,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
 
         with self.mocker:
             self.assertEqual(response, test_view(request))
-        
+
     def test_decorator_authenticated_without_parens(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
@@ -226,11 +211,11 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
 
         with self.mocker:
             self.assertEqual(response, test_view(request))
-        
+
     def test_decorator_authenticated_with_full_uri(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
-        
+
         @httpdigest
         def test_view(request):
             return response
@@ -243,7 +228,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
 
         with self.mocker:
             self.assertEqual(response, test_view(request))
-        
+
     def test_decorator_with_realm_mismatch(self):
         response = self.mocker.mock(count=False)
 
@@ -259,7 +244,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             final_response = test_view(request)
             self.assertEqual(401, final_response.status_code)
             self.assertTrue('WWW-Authenticate' in final_response)
-        
+
     def test_decorator_unauthenticated_and_custom_settings(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
@@ -277,7 +262,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertEqual(401, final_response.status_code)
             self.assertTrue('WWW-Authenticate' in final_response)
             self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
-        
+
     def test_decorator_with_pre_constructed_authenticator(self):
         response = self.mocker.mock(count=False)
         expect(response.status_code).result(200)
@@ -298,18 +283,18 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
 
     def test_disable_nonce_count_enforcement(self):
         with patch(settings, DIGEST_ENFORCE_NONCE_COUNT=False):
-            testuser = User.objects.create_user(username='testuser', 
+            testuser = User.objects.create_user(username='testuser',
                                                 email='user@example.com',
                                                 password='pass')
-    
+
             nonce=python_digest.calculate_nonce(time.time(),
                                                 secret=settings.SECRET_KEY)
-    
+
             first_request = self.create_mock_request(
                 username=testuser.username, password='pass', nonce=nonce)
 
             first_request.user = testuser
-            
+
             # same nonce, same nonce count, will succeed
             second_request = self.create_mock_request(
                 username=testuser.username, password='pass', nonce=nonce)
@@ -469,25 +454,25 @@ class ModelsTests(TestCase):
                 set([pd.login
                      for pd in PartialDigest.objects.filter(confirmed=True)]))
             user_pd = PartialDigest.objects.get(login='user').partial_digest
-    
+
             self.assertEqual(
                 set(['email@example.com', 'other@example.com']),
                 set([pd.login
                      for pd in PartialDigest.objects.filter(confirmed=False)]))
             email_pd = PartialDigest.objects.get(
                 login='email@example.com').partial_digest
-    
+
             with patch(DummyLoginFactory,
                        confirmed_logins=['user', 'email@example.com'],
                        unconfirmed_logins=['wierdo']):
                 from django_digest.models import _review_partial_digests
                 _review_partial_digests(user)
-    
+
             self.assertEqual(
                 set(['user', 'email@example.com']),
                 set([pd.login
                      for pd in PartialDigest.objects.filter(confirmed=True)]))
-    
+
             self.assertEqual(
                 set(['wierdo']),
                 set([pd.login
@@ -509,7 +494,7 @@ class ModelsTests(TestCase):
         # expectations will be different for Django >= 1.2
         if user.email == 'TestUser@example.com':
             expected += [user.email]
-            
+
         self.assertEqual(
             set(expected),
             set([pd.login for pd in PartialDigest.objects.all()]))
@@ -578,8 +563,7 @@ class ModelsTests(TestCase):
 
 
 class MiddlewareTests(SettingsMixin, TestCase):
-    def setUp(self, *args, **kwargs):
-        super(MiddlewareTests, self).setUp(*args, **kwargs)
+    def setUp(self):
         self.mocker = Mocker()
 
     def test_valid_login(self):
@@ -635,7 +619,7 @@ class MiddlewareTests(SettingsMixin, TestCase):
                 response,
                 HttpDigestMiddleware(authenticator=authenticator).process_response(
                     request, response))
-        
+
     def test_process_response_404(self):
         authenticator = self.mocker.mock(count=False)
         request = self.mocker.mock()
@@ -670,10 +654,10 @@ class DbBackendTests(TestCase):
         user2 = User.objects.create_user(username='User2', email='user2@example.com',
                                          password='pass')
         self.assertEqual(None, AccountStorage().get_partial_digest(user1.username))
-        username_pd = AccountStorage().get_partial_digest(user2.username) 
+        username_pd = AccountStorage().get_partial_digest(user2.username)
         lowercase_username_pd = AccountStorage().get_partial_digest(
-            user2.username.lower()) 
-        email_pd = AccountStorage().get_partial_digest(user2.email) 
+            user2.username.lower())
+        email_pd = AccountStorage().get_partial_digest(user2.email)
         self.assertTrue(username_pd is not None)
         self.assertTrue(lowercase_username_pd is not None)
         self.assertTrue(email_pd is not None)
@@ -698,4 +682,4 @@ class DbBackendTests(TestCase):
                                         password='pass')
         PartialDigest.objects.create(user=user, login=user.username,
                                      confirmed=True, partial_digest='foo')
-        self.assertEqual(AccountStorage().get_user(user.username), None)
+        self.assertEqual(AccountStorage().get_user(user.username), None)gs
