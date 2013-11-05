@@ -1,21 +1,13 @@
-from datetime import datetime
-
-from django.db import IntegrityError
-
-from django_digest.models import PartialDigest
-from django_digest.utils import get_default_db
 import logging
 
-try:
-    from logging import NullHandler
-except ImportError:
-    class NullHandler(logging.Handler):
-        def emit(self, record):
-            pass
-
 _l = logging.getLogger(__name__)
-_l.addHandler(NullHandler())
 _l.setLevel(logging.DEBUG)
+
+from datetime import datetime
+
+from django.db import IntegrityError, connection, transaction
+
+from django_digest.models import PartialDigest
 
 class AccountStorage(object):
     GET_PARTIAL_DIGEST_QUERY = """
@@ -27,16 +19,13 @@ class AccountStorage(object):
         AND auth_user.is_active
     """
 
-    def __init__(self, db=None):
-        self.db = db or get_default_db()
-
     def get_partial_digest(self, username):
-        cursor = self.db.connection.cursor()
+        cursor = connection.cursor()
         cursor.execute(self.GET_PARTIAL_DIGEST_QUERY, [username])
         # In MySQL, string comparison is case-insensitive by default.
         # Therefore a second round of filtering is required.
         row = [(row[1]) for row in cursor.fetchall() if row[0] == username]
-        self.db.commit()
+        transaction.commit_unless_managed()
         if not row:
             return None
         return row[0]
@@ -86,51 +75,48 @@ class NonceStorage(object):
       VALUES (%s, %s, %s, %s)
     """
 
-    def __init__(self, db=None):
-        self.db = db or get_default_db()
-
     def _expire_nonces_for_user(self, user):
-        cursor = self.db.connection.cursor()
+        cursor = connection.cursor()
         cursor.execute(self.DELETE_OLDER_THAN_QUERY, [user.id])
         row = cursor.fetchone()
-        self.db.commit()
+        transaction.commit_unless_managed()
         if not row:
             return
         delete_older_than = row[0]
         cursor.execute(self.DELETE_EXPIRED_NONCES_QUERY, [delete_older_than])
-        self.db.commit()
+        transaction.commit_unless_managed()
 
     def update_existing_nonce(self, user, nonce, nonce_count):
-        cursor = self.db.connection.cursor()
+        cursor = connection.cursor()
         if nonce_count == None:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITHOUT_COUNT_QUERY,
-                [self.db.connection.ops.value_to_db_datetime(datetime.now()),
+                [connection.ops.value_to_db_datetime(datetime.now()),
                  nonce, user.id]
             )
         else:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITH_COUNT_QUERY,
                 [nonce_count,
-                 self.db.connection.ops.value_to_db_datetime(datetime.now()),
+                 connection.ops.value_to_db_datetime(datetime.now()),
                  nonce, user.id, nonce_count]
             )
-        self.db.commit()
+        transaction.commit_unless_managed()
         # if no rows are updated, either the nonce isn't in the DB,
         # it's for a different user, or the count is bad
         return cursor.rowcount == 1
 
     def store_nonce(self, user, nonce, nonce_count):
         self._expire_nonces_for_user(user)
-        cursor = self.db.connection.cursor()
+        cursor = connection.cursor()
         try:
             cursor.execute(
                 self.INSERT_NONCE_QUERY,
                 [user.id, nonce, nonce_count,
-                 self.db.connection.ops.value_to_db_datetime(datetime.now())]
+                 connection.ops.value_to_db_datetime(datetime.now())]
             )
             return True
         except IntegrityError:
             return False
         finally:
-            self.db.commit()
+            transaction.commit_unless_managed()

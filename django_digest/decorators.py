@@ -1,9 +1,7 @@
-import types
-
 from functools import partial
 from operator import isCallable
 
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
 
 from decorator import decorator
 
