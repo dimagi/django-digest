@@ -10,10 +10,6 @@ from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
 _l = logging.getLogger(__name__)
 _l.setLevel(logging.DEBUG)
-sh = logging.handlers.SysLogHandler(address=get_setting('DJANGO_DIGEST_LOG_ADDRESS', '/dev/log'))
-formatter = logging.Formatter(get_setting('DJANGO_DIGEST_LOG_FORMAT', '%(message)s'))
-sh.setFormatter(formatter)
-_l.addHandler(sh)
 
 
 class DefaultLoginFactory(object):
