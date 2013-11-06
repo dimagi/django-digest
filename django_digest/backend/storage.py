@@ -8,20 +8,6 @@ from datetime import datetime
 from django.db import IntegrityError, connection, transaction
 
 from django_digest.models import PartialDigest
-from django_digest.utils import get_default_db
-import logging
-
-try:
-    from logging import NullHandler
-except ImportError:
-    class NullHandler(logging.Handler):
-        def emit(self, record):
-            pass
-
-_l = logging.getLogger(__name__)
-_l.addHandler(NullHandler())
-_l.setLevel(logging.DEBUG)
-
 
 class AccountStorage(object):
     GET_PARTIAL_DIGEST_QUERY = """
