@@ -2,19 +2,27 @@ import logging
 import random
 import time
 
-from django.http import HttpResponse
+from django.core import exceptions
+        
+from django.http import HttpRequest, HttpResponse
+from django.utils.importlib import import_module
 
 import python_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
-_l = logging.getLogger(__name__)
-_l.setLevel(logging.DEBUG)
-sh = logging.handlers.SysLogHandler(address=get_setting('DJANGO_DIGEST_LOG_ADDRESS', '/dev/log'))
-formatter = logging.Formatter(get_setting('DJANGO_DIGEST_LOG_FORMAT', '%(message)s'))
-sh.setFormatter(formatter)
-_l.addHandler(sh)
+# Make sure a NullHandler is available
+# This was added in Python 2.7/3.2
+try:
+    from logging import NullHandler
+except ImportError:
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
 
+_l = logging.getLogger(__name__)
+_l.addHandler(NullHandler())
+_l.setLevel(logging.DEBUG)
 
 class DefaultLoginFactory(object):
     def confirmed_logins_for_user(self, user):
@@ -26,14 +34,13 @@ class DefaultLoginFactory(object):
         return []
 
 class HttpDigestAuthenticator(object):
-
+    
     def __init__(self,
                  account_storage=None,
                  nonce_storage=None,
                  realm=None,
                  timeout=None,
-                 enforce_nonce_count=None,
-                 failure_callback=None):
+                 enforce_nonce_count=None):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
@@ -41,11 +48,10 @@ class HttpDigestAuthenticator(object):
         self.realm = realm or get_setting('DIGEST_REALM', DEFAULT_REALM)
         self.timeout = timeout or get_setting('DIGEST_NONCE_TIMEOUT_IN_SECONDS', 5*60)
         self._account_storage = (account_storage or get_backend(
-                'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.storage.AccountStorage'))
+                'DIGEST_ACCOUNT_BACKEND', 'django_digest.backend.db.AccountStorage'))
         self._nonce_storage = (nonce_storage or get_backend(
-                'DIGEST_NONCE_BACKEND', 'django_digest.backend.storage.NonceStorage'))
+                'DIGEST_NONCE_BACKEND', 'django_digest.backend.db.NonceStorage'))
         self.secret_key = get_setting('SECRET_KEY')
-        self.failure_callback = failure_callback
 
     @staticmethod
     def contains_digest_credentials(request):
@@ -78,7 +84,7 @@ class HttpDigestAuthenticator(object):
             _l.debug('authentication failure: supplied digest credentials could not be ' \
                          'parsed: "%s".' % request.META['HTTP_AUTHORIZATION'])
             return False
-
+        
         if not digest_response.realm == self.realm:
             _l.debug('authentication failure: supplied realm "%s" does not match ' \
                          'configured realm "%s".' % ( digest_response.realm, self.realm))
@@ -100,8 +106,6 @@ class HttpDigestAuthenticator(object):
         if not calculated_request_digest == digest_response.response:
             _l.debug('authentication failure: supplied request digest does not match ' \
                          'calculated request digest.')
-            if self.failure_callback:
-                self.failure_callback(request, digest_response.username)
             return False
 
         if not python_digest.validate_uri(digest_response.uri, request.path):
@@ -126,7 +130,7 @@ class HttpDigestAuthenticator(object):
 
         request.user = user
         return True
-
+            
     def build_challenge_response(self, stale=False):
         response = HttpResponse('Authorization Required',
                                 content_type='text/plain', status=401)
