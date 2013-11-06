@@ -17,7 +17,7 @@ class UserNonce(models.Model):
 
 class PartialDigest(models.Model):
     user = models.ForeignKey(User)
-    login = models.CharField(max_length=75, db_index=True)
+    login = models.CharField(max_length=128, db_index=True)
     partial_digest = models.CharField(max_length=100)
     confirmed = models.BooleanField(default=True)
     
