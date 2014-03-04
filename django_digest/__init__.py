@@ -23,7 +23,6 @@ class DefaultLoginFactory(object):
 
 class NoEmailLoginFactory(object):
     def confirmed_logins_for_user(self, user):
-        print 'properly overriding login factory'
         return [login for login in
                 [user.username, user.username.lower()] if login]
 
