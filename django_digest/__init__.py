@@ -21,6 +21,16 @@ class DefaultLoginFactory(object):
     def unconfirmed_logins_for_user(self, user):
         return []
 
+class NoEmailLoginFactory(object):
+    def confirmed_logins_for_user(self, user):
+        print 'properly overriding login factory'
+        return [login for login in
+                [user.username, user.username.lower()] if login]
+
+    def unconfirmed_logins_for_user(self, user):
+        return []
+
+
 class HttpDigestAuthenticator(object):
 
     def __init__(self,

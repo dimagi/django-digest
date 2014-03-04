@@ -440,6 +440,11 @@ class DummyLoginFactory(object):
         return self.unconfirmed_logins
 
 class ModelsTests(TestCase):
+
+    def setUp(self):
+        # force the default backend to the one expected by tests
+        settings.DIGEST_LOGIN_FACTORY = 'django_digest.DefaultLoginFactory'
+
     def test_unconfirmed_partial_digests(self):
         PartialDigest.objects.all().delete()
         with patch(settings,
@@ -632,6 +637,11 @@ class MiddlewareTests(SettingsMixin, TestCase):
                     request, response))
 
 class DbBackendTests(TestCase):
+
+    def setUp(self):
+        # force the default backend to the one expected by tests
+        settings.DIGEST_LOGIN_FACTORY = 'django_digest.DefaultLoginFactory'
+
     def test_filter_out_inactive_users(self):
         user1 = User.objects.create(username='user1', email='user1@example.com',
                                     is_active=False)
