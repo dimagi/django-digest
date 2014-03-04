@@ -15,7 +15,8 @@ _l.setLevel(logging.DEBUG)
 class DefaultLoginFactory(object):
     def confirmed_logins_for_user(self, user):
         return [login for login in
-                [user.username, user.username.lower()] if login]
+                [user.username, user.username.lower(), user.email,
+                 user.email and user.email.lower()] if login]
 
     def unconfirmed_logins_for_user(self, user):
         return []
