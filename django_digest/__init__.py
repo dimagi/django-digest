@@ -76,6 +76,11 @@ class HttpDigestAuthenticator(object):
         if not python_digest.is_digest_credential(request.META['HTTP_AUTHORIZATION']):
             return False
 
+        try:
+            unicode(request.META['HTTP_AUTHORIZATION'], 'utf-8')
+        except UnicodeDecodeError:
+            return False
+
         digest_response = python_digest.parse_digest_credentials(
             request.META['HTTP_AUTHORIZATION'])
 
