@@ -334,7 +334,7 @@ class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
             self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
                 first_request
             ))
-            with transaction.commit_on_success():
+            with transaction.atomic():
                 self.assertTrue(authenticator.authenticate(first_request))
                 self.assertFalse(authenticator.authenticate(second_request))
                 transaction.rollback()
