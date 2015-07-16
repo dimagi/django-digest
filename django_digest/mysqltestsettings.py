@@ -1,5 +1,4 @@
 from django_digest.testsettings import *
-INSTALLED_APPS += ('south',)
 
 DATABASE_ENGINE = 'mysql' 
 DATABASE_STORAGE_ENGINE = 'InnoDB'
