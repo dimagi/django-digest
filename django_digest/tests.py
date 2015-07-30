@@ -334,11 +334,13 @@ class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
             self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
                 first_request
             ))
-            with transaction.commit_on_success():
-                self.assertTrue(authenticator.authenticate(first_request))
-                self.assertFalse(authenticator.authenticate(second_request))
-                transaction.rollback()
-                self.assertTrue(authenticator.authenticate(third_request))
+            transaction.set_autocommit(False)
+            self.assertTrue(authenticator.authenticate(first_request))
+            self.assertFalse(authenticator.authenticate(second_request))
+            transaction.rollback()
+            self.assertTrue(authenticator.authenticate(third_request))
+            transaction.commit()
+            transaction.set_autocommit(True)
 
 class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
     def test_authenticate_invalid(self):
