@@ -12,7 +12,7 @@ def get_backend(setting_name, default_backend_class_path):
     path = get_setting(setting_name, default_backend_class_path)
 
     from django.core import exceptions
-    from django.utils.importlib import import_module
+    from importlib import import_module
 
     path_components = path.rsplit('.', 1)
     if not len(path_components) == 2:
