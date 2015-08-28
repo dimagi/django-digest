@@ -13,6 +13,7 @@ class UserNonce(models.Model):
     count = models.IntegerField(null=True)
     last_used_at = models.DateTimeField(null=False)
     class Meta:
+        app_label = 'django_digest'
         ordering = ('last_used_at',)
 
 class PartialDigest(models.Model):
@@ -20,6 +21,8 @@ class PartialDigest(models.Model):
     login = models.CharField(max_length=128, db_index=True)
     partial_digest = models.CharField(max_length=100)
     confirmed = models.BooleanField(default=True)
+    class Meta:
+        app_label = 'django_digest'
     
 _postponed_partial_digests = {}
 
