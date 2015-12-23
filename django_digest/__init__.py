@@ -3,6 +3,7 @@ import random
 import time
 
 from django.http import HttpResponse
+from django.contrib.auth.signals import user_login_failed
 
 import python_digest
 
@@ -29,6 +30,9 @@ class NoEmailLoginFactory(object):
     def unconfirmed_logins_for_user(self, user):
         return []
 
+def _send_fail_signal(request, username):
+    user_login_failed.send(sender=__name__, credentials={'username': username})
+
 
 class HttpDigestAuthenticator(object):
 
@@ -38,7 +42,7 @@ class HttpDigestAuthenticator(object):
                  realm=None,
                  timeout=None,
                  enforce_nonce_count=None,
-                 failure_callback=None):
+                 failure_callback=_send_fail_signal):
         if not enforce_nonce_count == None:
             self._enforce_nonce_count = enforce_nonce_count
         else:
