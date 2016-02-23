@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
 from django.db import models
@@ -8,7 +9,7 @@ from python_digest import calculate_partial_digest
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
 class UserNonce(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     nonce = models.CharField(max_length=100, unique=True, db_index=True)
     count = models.IntegerField(null=True)
     last_used_at = models.DateTimeField(null=False)
@@ -17,7 +18,7 @@ class UserNonce(models.Model):
         ordering = ('last_used_at',)
 
 class PartialDigest(models.Model):
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL)
     login = models.CharField(max_length=128, db_index=True)
     partial_digest = models.CharField(max_length=100)
     confirmed = models.BooleanField(default=True)
