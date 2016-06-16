@@ -641,6 +641,7 @@ class MiddlewareTests(SettingsMixin, TestCase):
 class DbBackendTests(TestCase):
 
     def setUp(self):
+        super(DbBackendTests, self).setUp()
         # force the default backend to the one expected by tests
         settings.DIGEST_LOGIN_FACTORY = 'django_digest.DefaultLoginFactory'
 
