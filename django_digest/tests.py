@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import time
 
 from mocker import Mocker, expect
+from nose.tools import nottest
 
 import python_digest
 from python_digest.utils import parse_parts
@@ -307,6 +308,7 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
 
 class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
                                          TransactionTestCase):
+    @nottest
     def test_authenticate_nonce(self):
         testuser = User.objects.create_user(
             username='testuser', email='user@example.com', password='pass')
