@@ -568,9 +568,9 @@ class ModelsTests(TestCase):
             set([pd.login for pd in PartialDigest.objects.all()]))
 
 
-
 class MiddlewareTests(SettingsMixin, TestCase):
     def setUp(self):
+        super(MiddlewareTests, self).setUp()
         self.mocker = Mocker()
 
     def test_valid_login(self):
