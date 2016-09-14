@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
                 ('login', models.CharField(max_length=128, db_index=True)),
                 ('partial_digest', models.CharField(max_length=100)),
                 ('confirmed', models.BooleanField(default=True)),
-                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
             ],
             options={
             },
@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                 ('nonce', models.CharField(unique=True, max_length=100, db_index=True)),
                 ('count', models.IntegerField(null=True)),
                 ('last_used_at', models.DateTimeField()),
-                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE)),
             ],
             options={
                 'ordering': ('last_used_at',),
