@@ -88,15 +88,12 @@ class NonceStorage(object):
         if nonce_count == None:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITHOUT_COUNT_QUERY,
-                [connection.ops.value_to_db_datetime(datetime.now()),
-                 nonce, user.id]
+                [datetime.utcnow(), nonce, user.id]
             )
         else:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITH_COUNT_QUERY,
-                [nonce_count,
-                 connection.ops.value_to_db_datetime(datetime.now()),
-                 nonce, user.id, nonce_count]
+                [nonce_count, datetime.utcnow(), nonce, user.id, nonce_count]
             )
         # if no rows are updated, either the nonce isn't in the DB,
         # it's for a different user, or the count is bad
@@ -108,8 +105,7 @@ class NonceStorage(object):
         try:
             cursor.execute(
                 self.INSERT_NONCE_QUERY,
-                [user.id, nonce, nonce_count,
-                 connection.ops.value_to_db_datetime(datetime.now())]
+                [user.id, nonce, nonce_count, datetime.utcnow()]
             )
             return True
         except IntegrityError:
