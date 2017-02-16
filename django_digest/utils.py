@@ -19,7 +19,7 @@ def get_backend(setting_name, default_backend_class_path):
         raise exceptions.ImproperlyConfigured('%s isn\'t a classname' % path)
     try:
         mod = import_module(path_components[0])
-    except ImportError, e:
+    except ImportError as e:
         raise exceptions.ImproperlyConfigured('Error importing module %s: "%s"' %
                                               (path_components[0], e))
 
