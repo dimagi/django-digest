@@ -6,7 +6,7 @@ from django.test import TransactionTestCase as DjangoTransactionTestCase
 from contextlib import contextmanager
 import time
 
-from mocker import Mocker, expect
+from mock import Mock
 
 import python_digest
 from python_digest.utils import parse_parts
@@ -14,7 +14,6 @@ from python_digest.utils import parse_parts
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.http import HttpRequest
 from django.utils.functional import LazyObject
 
 from django_digest import HttpDigestAuthenticator
@@ -122,8 +121,6 @@ class UtilsTest(TestCase):
 
 
 class MockRequestMixin(object):
-    def setUp(self):
-        self.mocker = Mocker()
 
     def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
@@ -142,28 +139,21 @@ class MockRequestMixin(object):
 
         request = self.create_mock_request_for_header(header)
 
-        expect(request.method).result(method)
-        expect(request.path).result(request_path)
+        request.method = method
+        request.path = request_path
 
         return request
 
     def create_mock_request_for_header(self, header):
-        request = self.mocker.mock(HttpRequest, count=False)
-
-        # bug in mocker: https://bugs.launchpad.net/mocker/+bug/179072
-        try:
-            'HTTP_AUTHORIZATION' in request.META
-        except:
-            pass
-        self.mocker.result(not header == None)
+        request = Mock()
 
         if header:
-            expect(request.META['HTTP_AUTHORIZATION']).count(0, None).result(header)
+            request.META['HTTP_AUTHORIZATION'].return_value = header
 
         return request
 
 
-class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
+class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase): # TODO - get this working
     def test_build_challenge_response(self):
         response = HttpDigestAuthenticator().build_challenge_response()
         self.assertEqual(401, response.status_code)
@@ -176,8 +166,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertEqual('CUSTOM', parts['realm'])
 
     def test_decorator_authenticated_with_parens(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest()
         def test_view(request):
@@ -195,8 +185,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertEqual(response, test_view(request))
 
     def test_decorator_authenticated_without_parens(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest
         def test_view(request):
@@ -213,8 +203,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertEqual(response, test_view(request))
 
     def test_decorator_authenticated_with_full_uri(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest
         def test_view(request):
@@ -246,8 +236,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertTrue('WWW-Authenticate' in final_response)
 
     def test_decorator_unauthenticated_and_custom_settings(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest(realm='MY_TEST_REALM')
         def test_view(request):
@@ -264,8 +254,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
 
     def test_decorator_with_pre_constructed_authenticator(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest(HttpDigestAuthenticator(realm='MY_TEST_REALM'))
         def test_view(request):
