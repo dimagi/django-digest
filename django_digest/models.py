@@ -103,8 +103,8 @@ def _new_check_password(user, raw_password):
         _after_authenticate(user, raw_password)
     return result
 
-def _new_authenticate(backend, username=None, password=None):
-    user = _old_authenticate(backend, username, password)
+def _new_authenticate(backend, request, username=None, password=None):
+    user = _old_authenticate(backend, request, username, password)
     if user:
         _after_authenticate(user, password)
     return user
