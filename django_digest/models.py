@@ -1,3 +1,4 @@
+import django
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
 from django.db import models
@@ -104,7 +105,10 @@ def _new_check_password(user, raw_password):
     return result
 
 def _new_authenticate(backend, request, username=None, password=None):
-    user = _old_authenticate(backend, request, username, password)
+    if django.VERSION >= (1, 11):
+        user = _old_authenticate(backend, request, username, password)
+    else:
+        user = _old_authenticate(backend, username, password)
     if user:
         _after_authenticate(user, password)
     return user
