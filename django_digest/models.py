@@ -1,3 +1,4 @@
+import django
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
 from django.db import models
@@ -103,7 +104,13 @@ def _new_check_password(user, raw_password):
         _after_authenticate(user, raw_password)
     return result
 
-def _new_authenticate(backend, username=None, password=None):
+def _new_authenticate(backend, request, username=None, password=None):
+    user = _old_authenticate(backend, request, username, password)
+    if user:
+        _after_authenticate(user, password)
+    return user
+
+def _new_authenticate_pre_1_11(backend, username=None, password=None):
     user = _old_authenticate(backend, username, password)
     if user:
         _after_authenticate(user, password)
@@ -115,7 +122,10 @@ def _new_set_password(user, raw_password):
 
 User.check_password = _new_check_password    
 User.set_password = _new_set_password
-ModelBackend.authenticate = _new_authenticate
+if django.VERSION >= (1, 11):
+    ModelBackend.authenticate = _new_authenticate
+else:
+    ModelBackend.authenticate = _new_authenticate_pre_1_11
 
 def _persist_partial_digests(user):
     password_hash = user.password
