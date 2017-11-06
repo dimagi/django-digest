@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import django.test
 
 from django_digest.test.methods.basic import BasicAuth

@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from south.db import db
 from south.v2 import SchemaMigration
 from django.db import models
