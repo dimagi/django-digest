@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 
 _l = logging.getLogger(__name__)

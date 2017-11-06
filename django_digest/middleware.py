@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django_digest import HttpDigestAuthenticator
 from django_digest.utils import get_setting
 

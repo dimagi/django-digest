@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django_digest.testsettings import *
 INSTALLED_APPS += ('south',)
 

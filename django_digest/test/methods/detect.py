@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from django_digest.test.methods import BaseAuth, WWWAuthenticateError
 
 class DetectAuth(BaseAuth):

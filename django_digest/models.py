@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import django
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User
