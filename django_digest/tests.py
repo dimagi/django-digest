@@ -532,7 +532,7 @@ class ModelsTests(TestCase):
         user = User.objects.create_user(username='TestUser', password='password',
                                         email='testuser@example.com')
         PartialDigest.objects.all().delete()
-        self.assertEqual(0,PartialDigest.objects.count())
+        self.assertEqual(0, PartialDigest.objects.count())
         from django.contrib.auth import authenticate
         self.assertEqual(user, authenticate(username='TestUser', password='password'))
         self.assertEqual(
@@ -547,7 +547,7 @@ class ModelsTests(TestCase):
         user = User.objects.create_user(username='TestUser', password='password',
                                         email='testuser@example.com')
         PartialDigest.objects.all().delete()
-        self.assertEqual(0,PartialDigest.objects.count())
+        self.assertEqual(0, PartialDigest.objects.count())
         from django.contrib.auth import authenticate
         self.assertEqual(user, authenticate(username='TestUser', password='password'))
         self.assertEqual(
