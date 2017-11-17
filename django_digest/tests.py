@@ -24,6 +24,7 @@ from django_digest.decorators import httpdigest
 from django_digest.middleware import HttpDigestMiddleware
 from django_digest.models import PartialDigest
 from django_digest.utils import get_setting, get_backend, DEFAULT_REALM
+import six
 
 @contextmanager
 def patch(namespace, **values):
@@ -36,7 +37,7 @@ def patch(namespace, **values):
             namespace._setup()
         namespace = namespace._wrapped
 
-    for (name, value) in values.iteritems():
+    for (name, value) in six.iteritems(values):
         try:
             originals[name] = getattr(namespace, name)
         except AttributeError:
@@ -50,7 +51,7 @@ def patch(namespace, **values):
     try:
         yield
     finally:
-        for (name, original_value) in originals.iteritems():
+        for (name, original_value) in six.iteritems(originals):
             if original_value is NotImplemented:
                 if values[name] is not NotImplemented:
                     delattr(namespace, name)
