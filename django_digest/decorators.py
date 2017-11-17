@@ -48,4 +48,4 @@ def httpdigest(*args, **kwargs):
     else:
         authenticator = HttpDigestAuthenticator(*args, **kwargs)
 
-    return lambda(f): decorator(partial(_httpdigest, authenticator), f)
+    return lambda f: decorator(partial(_httpdigest, authenticator), f)
