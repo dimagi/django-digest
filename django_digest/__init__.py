@@ -9,6 +9,7 @@ from django.contrib.auth.signals import user_login_failed
 import python_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
+import six
 
 _l = logging.getLogger(__name__)
 _l.setLevel(logging.DEBUG)
@@ -82,7 +83,7 @@ class HttpDigestAuthenticator(object):
             return False
 
         try:
-            unicode(request.META['HTTP_AUTHORIZATION'], 'utf-8')
+            six.text_type(request.META['HTTP_AUTHORIZATION'], 'utf-8')
         except UnicodeDecodeError:
             return False
 
