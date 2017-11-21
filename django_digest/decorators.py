@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 from functools import partial
-from operator import isCallable
 
 from django.http import HttpRequest
 
@@ -39,7 +38,7 @@ def httpdigest(*args, **kwargs):
     * as a decorator factory (with the argument being a pre-constructed HttpDigestAuthenticator
     instance used to protect the decorated view)
     '''
-    if len(args) == 1 and not kwargs and isCallable(args[0]):
+    if len(args) == 1 and not kwargs and callable(args[0]):
         authenticator = HttpDigestAuthenticator()
         return decorator(partial(_httpdigest, authenticator), args[0])
 
