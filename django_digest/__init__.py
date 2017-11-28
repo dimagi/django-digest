@@ -10,6 +10,7 @@ import python_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 import six
+from six.moves import range
 
 _l = logging.getLogger(__name__)
 _l.setLevel(logging.DEBUG)
