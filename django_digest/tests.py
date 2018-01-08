@@ -7,7 +7,7 @@ from django.test import TransactionTestCase as DjangoTransactionTestCase
 from contextlib import contextmanager
 import time
 
-from mocker import Mocker, expect
+from mock import Mock
 
 import python_digest
 from python_digest.utils import parse_parts
@@ -124,8 +124,6 @@ class UtilsTest(TestCase):
 
 
 class MockRequestMixin(object):
-    def setUp(self):
-        self.mocker = Mocker()
 
     def create_mock_request(self, username='dummy-username', realm=None,
                             method='GET', uri='/dummy/uri', nonce=None, request_digest=None,
@@ -144,23 +142,17 @@ class MockRequestMixin(object):
 
         request = self.create_mock_request_for_header(header)
 
-        expect(request.method).result(method)
-        expect(request.path).result(request_path)
+        request.method = method
+        request.path = request_path
 
         return request
 
     def create_mock_request_for_header(self, header):
-        request = self.mocker.mock(HttpRequest, count=False)
-
-        # bug in mocker: https://bugs.launchpad.net/mocker/+bug/179072
-        try:
-            'HTTP_AUTHORIZATION' in request.META
-        except:
-            pass
-        self.mocker.result(not header == None)
+        request = Mock(spec=HttpRequest)
+        request.META = {}
 
         if header:
-            expect(request.META['HTTP_AUTHORIZATION']).count(0, None).result(header)
+            request.META['HTTP_AUTHORIZATION'] = header
 
         return request
 
@@ -178,8 +170,8 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertEqual('CUSTOM', parts['realm'])
 
     def test_decorator_authenticated_with_parens(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest()
         def test_view(request):
@@ -193,12 +185,11 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
         # expect the following assignment:
         request.user = testuser
 
-        with self.mocker:
-            self.assertEqual(response, test_view(request))
+        self.assertEqual(response, test_view(request))
 
     def test_decorator_authenticated_without_parens(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest
         def test_view(request):
@@ -211,12 +202,11 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
                                            password='pass')
         request.user = testuser
 
-        with self.mocker:
-            self.assertEqual(response, test_view(request))
+        self.assertEqual(response, test_view(request))
 
     def test_decorator_authenticated_with_full_uri(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest
         def test_view(request):
@@ -228,11 +218,10 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
                                            request_path='/some/path')
         request.user = testuser
 
-        with self.mocker:
-            self.assertEqual(response, test_view(request))
+        self.assertEqual(response, test_view(request))
 
     def test_decorator_with_realm_mismatch(self):
-        response = self.mocker.mock(count=False)
+        response = Mock()
 
         @httpdigest
         def test_view(request):
@@ -242,14 +231,13 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
         request = self.create_mock_request(username=testuser.username, password='pass',
                                            realm='BAD_REALM')
 
-        with self.mocker:
-            final_response = test_view(request)
-            self.assertEqual(401, final_response.status_code)
-            self.assertTrue('WWW-Authenticate' in final_response)
+        final_response = test_view(request)
+        self.assertEqual(401, final_response.status_code)
+        self.assertTrue('WWW-Authenticate' in final_response)
 
     def test_decorator_unauthenticated_and_custom_settings(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest(realm='MY_TEST_REALM')
         def test_view(request):
@@ -259,15 +247,14 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
         request = self.create_mock_request_for_header(None)
         request.user = testuser
 
-        with self.mocker:
-            final_response = test_view(request)
-            self.assertEqual(401, final_response.status_code)
-            self.assertTrue('WWW-Authenticate' in final_response)
-            self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
+        final_response = test_view(request)
+        self.assertEqual(401, final_response.status_code)
+        self.assertTrue('WWW-Authenticate' in final_response)
+        self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
 
     def test_decorator_with_pre_constructed_authenticator(self):
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
+        response = Mock()
+        response.status_code.return_value = 200
 
         @httpdigest(HttpDigestAuthenticator(realm='MY_TEST_REALM'))
         def test_view(request):
@@ -277,11 +264,10 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
         request = self.create_mock_request_for_header(None)
         request.user = testuser
 
-        with self.mocker:
-            final_response = test_view(request)
-            self.assertEqual(401, final_response.status_code)
-            self.assertTrue('WWW-Authenticate' in final_response)
-            self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
+        final_response = test_view(request)
+        self.assertEqual(401, final_response.status_code)
+        self.assertTrue('WWW-Authenticate' in final_response)
+        self.assertTrue('MY_TEST_REALM' in final_response['WWW-Authenticate'])
 
     def test_disable_nonce_count_enforcement(self):
         with patch(settings, DIGEST_ENFORCE_NONCE_COUNT=False):
@@ -302,10 +288,9 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
                 username=testuser.username, password='pass', nonce=nonce)
             second_request.user = testuser
 
-            with self.mocker:
-                authenticator = HttpDigestAuthenticator()
-                self.assertTrue(authenticator.authenticate(first_request))
-                self.assertTrue(authenticator.authenticate(second_request))
+            authenticator = HttpDigestAuthenticator()
+            self.assertTrue(authenticator.authenticate(first_request))
+            self.assertTrue(authenticator.authenticate(second_request))
 
 class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
                                          TransactionTestCase):
@@ -332,17 +317,19 @@ class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
         third_request.user = testuser
 
         authenticator = HttpDigestAuthenticator()
-        with self.mocker:
-            self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
-                first_request
-            ))
-            transaction.set_autocommit(False)
-            self.assertTrue(authenticator.authenticate(first_request))
-            self.assertFalse(authenticator.authenticate(second_request))
-            transaction.rollback()
-            self.assertTrue(authenticator.authenticate(third_request))
-            transaction.commit()
-            transaction.set_autocommit(True)
+        assert 'HTTP_AUTHORIZATION' in first_request.META
+        assert python_digest.is_digest_credential(first_request.META['HTTP_AUTHORIZATION'])
+
+        self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
+            first_request
+        ))
+        transaction.set_autocommit(False)
+        self.assertTrue(authenticator.authenticate(first_request))
+        self.assertFalse(authenticator.authenticate(second_request))
+        transaction.rollback()
+        self.assertTrue(authenticator.authenticate(third_request))
+        transaction.commit()
+        transaction.set_autocommit(True)
 
 class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
     def test_authenticate_invalid(self):
@@ -395,15 +382,14 @@ class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
             nonce_count=4)
 
         authenticator = HttpDigestAuthenticator()
-        with self.mocker:
-            self.assertFalse(authenticator.authenticate(fourth_request))
-            self.assertFalse(authenticator.authenticate(fifth_request))
-            self.assertFalse(authenticator.authenticate(sixth_request))
-            self.assertFalse(authenticator.authenticate(seventh_request))
-            self.assertTrue(authenticator.authenticate(eighth_request))
-            self.assertFalse(authenticator.authenticate(ninth_request))
-            self.assertFalse(authenticator.authenticate(tenth_request))
-            self.assertFalse(authenticator.authenticate(eleventh_request))
+        self.assertFalse(authenticator.authenticate(fourth_request))
+        self.assertFalse(authenticator.authenticate(fifth_request))
+        self.assertFalse(authenticator.authenticate(sixth_request))
+        self.assertFalse(authenticator.authenticate(seventh_request))
+        self.assertTrue(authenticator.authenticate(eighth_request))
+        self.assertFalse(authenticator.authenticate(ninth_request))
+        self.assertFalse(authenticator.authenticate(tenth_request))
+        self.assertFalse(authenticator.authenticate(eleventh_request))
 
     def test_authenticate_missing(self):
         testuser = User.objects.create_user(username='testuser',
@@ -420,9 +406,8 @@ class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
                                                    nonce_count=3)
 
         authenticator = HttpDigestAuthenticator()
-        with self.mocker:
-            PartialDigest.objects.all().delete()
-            self.assertFalse(authenticator.authenticate(twelfth_request))
+        PartialDigest.objects.all().delete()
+        self.assertFalse(authenticator.authenticate(twelfth_request))
 
     def test_authenticate_basic(self):
         # a request for Basic auth
@@ -430,8 +415,8 @@ class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
             'Basic YmxhaDpibGFo')
 
         authenticator = HttpDigestAuthenticator()
-        with self.mocker:
-            self.assertFalse(authenticator.authenticate(thirteenth_request))
+        self.assertFalse(authenticator.authenticate(thirteenth_request))
+
 
 class DummyLoginFactory(object):
     confirmed_logins = []
@@ -571,74 +556,65 @@ class ModelsTests(TestCase):
 
 
 class MiddlewareTests(SettingsMixin, TestCase):
-    def setUp(self):
-        super(MiddlewareTests, self).setUp()
-        self.mocker = Mocker()
 
     def test_valid_login(self):
-        authenticator = self.mocker.mock()
-        request = self.mocker.mock()
-        expect(authenticator.authenticate(request)).result(True)
-        with self.mocker:
-            self.assertEqual(
-                None, HttpDigestMiddleware(authenticator=authenticator).process_request(request))
+        authenticator = Mock()
+        request = Mock()
+        authenticator.authenticate.return_value = True
+        self.assertEqual(
+            None, HttpDigestMiddleware(authenticator=authenticator).process_request(request))
 
     def test_no_login_and_not_required(self):
-        authenticator = self.mocker.mock()
-        request = self.mocker.mock()
-        expect(authenticator.authenticate(request)).result(False)
-        expect(authenticator.contains_digest_credentials(request)).result(False)
-        with self.mocker:
-            self.assertEqual(
-                None, HttpDigestMiddleware(authenticator=authenticator).process_request(request))
+        authenticator = Mock()
+        request = Mock()
+        authenticator.authenticate.return_value = False
+        authenticator.contains_digest_credentials.return_value = False
+        self.assertEqual(
+            None, HttpDigestMiddleware(authenticator=authenticator).process_request(request))
 
     def test_no_login_and_required(self):
-        authenticator = self.mocker.mock(count=False)
-        request = self.mocker.mock()
-        response = self.mocker.mock()
-        expect(authenticator.authenticate(request)).result(False)
-        expect(authenticator.contains_digest_credentials(request)).result(False)
-        expect(authenticator.build_challenge_response()).result(response)
-        with self.mocker:
-            self.assertEqual(
-                response,
-                HttpDigestMiddleware(authenticator=authenticator,
-                                     require_authentication=True).process_request(request))
+        authenticator = Mock()
+        request = Mock()
+        response = Mock()
+        authenticator.authenticate.return_value = False
+        authenticator.contains_digest_credentials.return_value = False
+        authenticator.build_challenge_response.return_value = response
+        self.assertEqual(
+            response,
+            HttpDigestMiddleware(authenticator=authenticator,
+                                 require_authentication=True).process_request(request))
 
     def test_process_response_401(self):
-        authenticator = self.mocker.mock(count=False)
-        request = self.mocker.mock()
-        response = self.mocker.mock(count=False)
-        challenge_response = self.mocker.mock()
-        expect(response.status_code).result(401)
-        expect(authenticator.build_challenge_response()).result(challenge_response)
-        with self.mocker:
-            self.assertEqual(
-                challenge_response,
-                HttpDigestMiddleware(authenticator=authenticator).process_response(
-                    request, response))
+        authenticator = Mock()
+        request = Mock()
+        response = Mock()
+        challenge_response = Mock()
+        response.status_code = 401
+        authenticator.build_challenge_response.return_value = challenge_response
+        self.assertEqual(
+            challenge_response,
+            HttpDigestMiddleware(authenticator=authenticator).process_response(
+                request, response))
 
     def test_process_response_200(self):
-        authenticator = self.mocker.mock(count=False)
-        request = self.mocker.mock()
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(200)
-        with self.mocker:
-            self.assertEqual(
-                response,
-                HttpDigestMiddleware(authenticator=authenticator).process_response(
-                    request, response))
+        authenticator = Mock()
+        request = Mock()
+        response = Mock()
+        response.status_code = 200
+        self.assertEqual(
+            response,
+            HttpDigestMiddleware(authenticator=authenticator).process_response(
+                request, response))
 
     def test_process_response_404(self):
-        authenticator = self.mocker.mock(count=False)
-        request = self.mocker.mock()
-        response = self.mocker.mock(count=False)
-        expect(response.status_code).result(404)
-        with self.mocker:
-            self.assertEqual(
-                response,
-                HttpDigestMiddleware(authenticator=authenticator).process_response(
-                    request, response))
+        authenticator = Mock()
+        request = Mock()
+        response = Mock()
+        response.status_code = 404
+        self.assertEqual(
+            response,
+            HttpDigestMiddleware(authenticator=authenticator).process_response(
+                request, response))
 
 class DbBackendTests(TestCase):
 
