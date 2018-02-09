@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from urllib import quote
+from six.moves.urllib.parse import quote
 
 from python_digest import build_authorization_request
 from django_digest.test.methods import BaseAuth, WWWAuthenticateError
