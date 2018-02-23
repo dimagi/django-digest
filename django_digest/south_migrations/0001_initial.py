@@ -4,7 +4,7 @@ from south.db import db
 from django.db import models
 from django_digest.models import *
 
-class Migration:
+class Migration(object):
     
     def forwards(self, orm):
         
