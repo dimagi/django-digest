@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 DATABASE_ENGINE = 'sqlite3'
 DATABASE_NAME = ':memory:'
 
