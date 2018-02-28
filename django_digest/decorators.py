@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
 from functools import partial
 
 from django.http import HttpRequest

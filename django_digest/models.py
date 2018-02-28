@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
 import django
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth.models import User

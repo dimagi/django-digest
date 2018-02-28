@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+from __future__ import unicode_literals
 from django_digest import HttpDigestAuthenticator
 from django_digest.utils import get_setting
 
