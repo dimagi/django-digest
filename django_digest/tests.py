@@ -345,7 +345,7 @@ class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
                                             secret=settings.SECRET_KEY)
         # an invalid request
         fourth_request = self.create_mock_request_for_header(
-            'Digest blah blah blah')
+            b'Digest blah blah blah')
 
         # an invalid request
         fifth_request = self.create_mock_request_for_header(None)
