@@ -6,6 +6,7 @@ from django_digest.test.methods.basic import BasicAuth
 from django_digest.test.methods.detect import DetectAuth
 from django_digest.test.methods.digest import DigestAuth
 
+
 class Client(django.test.Client):
     AUTH_METHODS = {'Basic': BasicAuth,
                     'Digest': DigestAuth}
@@ -17,10 +18,17 @@ class Client(django.test.Client):
     def request(self, **request):
         if self.auth_method:
             request.update(self.auth_method(request))
+
+        # This payload object can only be read once. Since digest auth involves
+        # two requests, refresh it for the second "request"
+        payload = request['wsgi.input'].read()
+        request['wsgi.input'] = django.test.client.FakePayload(payload)
+
         response = super(Client, self).request(**request)
         if response.status_code == 401 and self.auth_method:
             # Try to authenticate
             request.update(self.auth_method(request, response))
+            request['wsgi.input'] = django.test.client.FakePayload(payload)
             response = super(Client, self).request(**request)
         return response
 
