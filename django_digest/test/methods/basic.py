@@ -4,6 +4,7 @@ from base64 import b64encode
 
 from django_digest.test.methods import WWWAuthenticateError, BaseAuth
 
+
 class BasicAuth(BaseAuth):
     def authorization(self, request, response):
         if response is not None:
@@ -14,4 +15,4 @@ class BasicAuth(BaseAuth):
                     (response.request['REQUEST_METHOD'],
                      response.request['PATH_INFO'])
                 )
-        return 'Basic %s' % b64encode(self.username + ':' +  self.password)
+        return 'Basic %s' % b64encode((self.username + ':' + self.password).encode('utf-8')).decode('utf-8')
