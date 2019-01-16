@@ -85,7 +85,8 @@ class HttpDigestAuthenticator(object):
             return False
 
         try:
-            six.text_type(request.META['HTTP_AUTHORIZATION'], 'utf-8')
+            if not isinstance(request.META['HTTP_AUTHORIZATION'], six.text_type):
+                request.META['HTTP_AUTHORIZATION'].decode('utf-8')
         except UnicodeDecodeError:
             return False
 
