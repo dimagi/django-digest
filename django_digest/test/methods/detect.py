@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
 from django_digest.test.methods import BaseAuth, WWWAuthenticateError
-import six
 
 class DetectAuth(BaseAuth):
     def __init__(self, client, *args, **kwargs):
@@ -17,7 +16,7 @@ class DetectAuth(BaseAuth):
                 return None
             
             challenges = self._authenticate_headers(response)
-            for method, challenge in six.iteritems(challenges):
+            for method, challenge in challenges.items():
                 # Loop through possible challenges to find the first one we
                 # can handle.
                 if method not in self.client.AUTH_METHODS:
