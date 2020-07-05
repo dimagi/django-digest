@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
+
 import django
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.backends import ModelBackend
-from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.signals import post_save
 
@@ -10,8 +12,9 @@ from python_digest import calculate_partial_digest
 
 from django_digest.utils import get_backend, get_setting, DEFAULT_REALM
 
+
 class UserNonce(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     nonce = models.CharField(max_length=100, unique=True, db_index=True)
     count = models.IntegerField(null=True)
     last_used_at = models.DateTimeField(null=False)
@@ -20,7 +23,7 @@ class UserNonce(models.Model):
         ordering = ('last_used_at',)
 
 class PartialDigest(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     login = models.CharField(max_length=128, db_index=True)
     partial_digest = models.CharField(max_length=100)
     confirmed = models.BooleanField(default=True)
@@ -65,8 +68,8 @@ def _prepare_partial_digests(user, raw_password):
     password_hash = user.password
     _postponed_partial_digests[password_hash] = partial_digests
 
-_old_set_password = User.set_password
-_old_check_password = User.check_password
+_old_set_password = get_user_model().set_password
+_old_check_password = get_user_model().check_password
 _old_authenticate = ModelBackend.authenticate
 
 def _review_partial_digests(user):
@@ -122,8 +125,8 @@ def _new_set_password(user, raw_password):
     _old_set_password(user, raw_password)
     _prepare_partial_digests(user, raw_password)
 
-User.check_password = _new_check_password    
-User.set_password = _new_set_password
+get_user_model().check_password = _new_check_password
+get_user_model().set_password = _new_set_password
 if django.VERSION >= (1, 11):
     ModelBackend.authenticate = _new_authenticate
 else:
@@ -139,4 +142,4 @@ def _post_save_persist_partial_digests(sender, instance=None, **kwargs):
     if instance is not None:
         _persist_partial_digests(instance)
 
-post_save.connect(_post_save_persist_partial_digests, sender=User)
+post_save.connect(_post_save_persist_partial_digests, sender=settings.AUTH_USER_MODEL)
