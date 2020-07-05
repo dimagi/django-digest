@@ -78,7 +78,7 @@ class NonceStorage(object):
 
     def _expire_nonces_for_user(self, user):
         cursor = connection.cursor()
-        cursor.execute(self.DELETE_OLDER_THAN_QUERY, [user.id])
+        cursor.execute(self.DELETE_OLDER_THAN_QUERY, [user.pk])
         row = cursor.fetchone()
         if not row:
             return
@@ -90,12 +90,12 @@ class NonceStorage(object):
         if nonce_count == None:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITHOUT_COUNT_QUERY,
-                [datetime.utcnow(), nonce, user.id]
+                [datetime.utcnow(), nonce, user.pk]
             )
         else:
             cursor.execute(
                 self.UPDATE_EXISTING_NONCE_WITH_COUNT_QUERY,
-                [nonce_count, datetime.utcnow(), nonce, user.id, nonce_count]
+                [nonce_count, datetime.utcnow(), nonce, user.pk, nonce_count]
             )
         # if no rows are updated, either the nonce isn't in the DB,
         # it's for a different user, or the count is bad
@@ -107,7 +107,7 @@ class NonceStorage(object):
         try:
             cursor.execute(
                 self.INSERT_NONCE_QUERY,
-                [user.id, nonce, nonce_count, datetime.utcnow()]
+                [user.pk, nonce, nonce_count, datetime.utcnow()]
             )
             return True
         except IntegrityError:
