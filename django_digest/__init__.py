@@ -4,7 +4,7 @@ import logging
 import random
 import time
 
-from django.contrib.auth import get_user, login
+from django.contrib.auth import login
 from django.http import HttpResponse
 from django.contrib.auth.signals import user_login_failed
 
