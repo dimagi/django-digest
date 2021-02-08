@@ -34,8 +34,12 @@ class NoEmailLoginFactory(object):
     def unconfirmed_logins_for_user(self, user):
         return []
 
+
 def _send_fail_signal(request, username):
-    user_login_failed.send(sender=__name__, credentials={'username': username})
+    user_login_failed.send(
+        sender=__name__,
+        credentials={'username': username},
+        request=request)
 
 
 class HttpDigestAuthenticator(object):
