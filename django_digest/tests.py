@@ -8,7 +8,7 @@ from django.test import TransactionTestCase as DjangoTransactionTestCase
 from contextlib import contextmanager
 import time
 
-from mock import Mock
+from unittest.mock import Mock
 
 import python_digest
 from python_digest.utils import parse_parts
