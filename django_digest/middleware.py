@@ -23,3 +23,32 @@ class HttpDigestMiddleware(object):
         if response.status_code == 401:
             return self._authenticator.build_challenge_response()
         return response
+
+
+class HttpDigestMiddleware2(object):
+    """The HTTP digest authentication middleware, for Django
+    since version 1.10.
+
+    Args:
+        get_response (Callable): The callable that takes the HTTP
+                                 request and returns the response
+
+    Attributes:
+        get_response (Callable): The callable that takes the HTTP
+                                 request and returns the response
+    """
+    get_response = None
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        authenticator = HttpDigestAuthenticator()
+        if (not authenticator.authenticate(request) and
+            (get_setting("DIGEST_REQUIRE_AUTHENTICATION", False) or
+             authenticator.contains_digest_credentials(request))):
+            return authenticator.build_challenge_response()
+        response = self.get_response(request)
+        if response.status_code == 401:
+            return authenticator.build_challenge_response()
+        return response

@@ -4,6 +4,7 @@ import logging
 import random
 import time
 
+from django.contrib.auth import login
 from django.http import HttpResponse
 from django.contrib.auth.signals import user_login_failed
 
@@ -147,7 +148,7 @@ class HttpDigestAuthenticator(object):
                              'or nonce count.')
                 return False
 
-        request.user = user
+        login(request, user)
         return True
 
     def build_challenge_response(self, stale=False):
