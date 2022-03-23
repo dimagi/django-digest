@@ -67,6 +67,7 @@ def _prepare_partial_digests(user, raw_password):
 
 _old_set_password = User.set_password
 _old_check_password = User.check_password
+_old_create_user = type(User.objects)._create_user
 _old_authenticate = ModelBackend.authenticate
 
 def _review_partial_digests(user):
@@ -122,8 +123,16 @@ def _new_set_password(user, raw_password):
     _old_set_password(user, raw_password)
     _prepare_partial_digests(user, raw_password)
 
-User.check_password = _new_check_password    
+def _new_create_user(self, username, email, password, **extra):
+    user = _old_create_user(self, username, email, password, **extra)
+    _prepare_partial_digests(user, password)
+    _persist_partial_digests(user)
+    return user
+
+User.check_password = _new_check_password
 User.set_password = _new_set_password
+if django.VERSION[0] > 2:
+    type(User.objects)._create_user = _new_create_user
 if django.VERSION >= (1, 11):
     ModelBackend.authenticate = _new_authenticate
 else:
