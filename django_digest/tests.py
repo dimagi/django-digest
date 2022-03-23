@@ -1,9 +1,7 @@
 from __future__ import with_statement
 from __future__ import absolute_import
 from __future__ import unicode_literals
-from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
-from django.test import TransactionTestCase as DjangoTransactionTestCase
 
 from contextlib import contextmanager
 import time
@@ -80,7 +78,7 @@ class SettingsMixin(object):
         # Bind self.TestCase to the actual TestCase superclass
         self.superclass = None
         for cls in self.__class__.__bases__:
-            if issubclass(cls, (TestCase, TransactionTestCase)):
+            if issubclass(cls, TestCase):
                 self.superclass = cls
         if not self.superclass:
             raise SyntaxError('SettingsMixin must be combined with a TestCase')
@@ -89,15 +87,6 @@ class SettingsMixin(object):
     def __call__(self, result=None):
         with patch(settings, **DUMMY_SETTINGS):
             return self.superclass.__call__(self, result)
-
-class TransactionTestCase(DjangoTransactionTestCase):
-    """
-    Works around Django issue 10827 by clearing the ContentType cache
-    before permissions are setup.
-    """
-    def _pre_setup(self, *args, **kwargs):
-        ContentType.objects.clear_cache()
-        super(TransactionTestCase, self)._pre_setup(*args, **kwargs)
 
 class UtilsTest(TestCase):
     def test_get_setting(self):
@@ -293,8 +282,6 @@ class DjangoDigestTests(SettingsMixin, MockRequestMixin, TestCase):
             self.assertTrue(authenticator.authenticate(first_request))
             self.assertTrue(authenticator.authenticate(second_request))
 
-class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
-                                         TransactionTestCase):
     def test_authenticate_nonce(self):
         testuser = User.objects.create_user(
             username='testuser', email='user@example.com', password='pass')
@@ -324,13 +311,11 @@ class DigestAuthenticateTransactionTests(SettingsMixin, MockRequestMixin,
         self.assertTrue(HttpDigestAuthenticator.contains_digest_credentials(
             first_request
         ))
-        transaction.set_autocommit(False)
-        self.assertTrue(authenticator.authenticate(first_request))
-        self.assertFalse(authenticator.authenticate(second_request))
-        transaction.rollback()
+        with transaction.atomic(savepoint=True):
+            self.assertTrue(authenticator.authenticate(first_request))
+            self.assertFalse(authenticator.authenticate(second_request))
+            transaction.get_connection().needs_rollback = True
         self.assertTrue(authenticator.authenticate(third_request))
-        transaction.commit()
-        transaction.set_autocommit(True)
 
 class DigestAuthenticateTests(SettingsMixin, MockRequestMixin, TestCase):
     def test_authenticate_invalid(self):
