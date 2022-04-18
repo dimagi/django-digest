@@ -41,7 +41,7 @@ class AccountStorage(object):
         if len(pds) == 0:
             return None
         if len(pds) > 1:
-            _l.warn("Multiple partial digests found for the login %r" % username)
+            _l.warning("Multiple partial digests found for the login %r" % username)
             return None
         return pds[0].user
 
