@@ -88,6 +88,8 @@ def _review_partial_digests(user):
         
     
 def _after_authenticate(user, password):
+    if user.id is None:
+        return
     for (confirmed, factory_method) in ((True, _confirmed_logins),
                                         (False, _unconfirmed_logins)):
         logins = factory_method(user)
